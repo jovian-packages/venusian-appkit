@@ -5,20 +5,18 @@ namespace Jovian\Venusian\AppKit\Views;
 use Jovian\Bindings\AppKit\NS\NSAttributedString;
 use Jovian\Bindings\AppKit\NS\NSButton;
 use Jovian\Bindings\AppKit\NS\NSControl;
-use Jovian\Bindings\AppKit\QuartzCore\CALayer;
 use Jovian\Bindings\AppKit\Runtime\Bridge;
 use Jovian\Bindings\AppKit\Runtime\ObjCObject;
 use Surface\Contracts\NativeWindows\Views\Color;
 use Surface\Contracts\NativeWindows\Views\FontSpec;
-use Surface\NativeWindows\Views\Button;
+use Surface\NativeWindows\Views\Checkbox;
 use Surface\NativeWindows\Windowable;
 
 /**
- * A Surface button over an NSButton. The click goes through the bridge's
- * shared action target into fireClick(), so the sketch's hook runs inside
- * the pump that delivered the click.
+ * A Surface checkbox over an NSButton minted in the checkbox type. The
+ * tick lands in fireToggled() with the state AppKit holds.
  */
-class AppKitButton extends Button
+class AppKitCheckbox extends Checkbox
 {
     use ComposesAppKitStyle;
     use TranslatesAppKitFrames;
@@ -27,24 +25,20 @@ class AppKitButton extends Button
         string $name,
         Windowable $window,
         string $label,
+        bool $checked,
         public readonly NSButton $button,
     ) {
-        parent::__construct($name, $window, $label);
+        parent::__construct($name, $window, $label, $checked);
 
         Bridge::setAction(
             $button->handle,
-            fn (ObjCObject $sender) => $this->fireClick(),
+            fn (ObjCObject $sender) => $this->fireToggled($this->button->state() === 1),
         );
     }
 
     protected function control(): NSControl
     {
         return $this->button;
-    }
-
-    protected function applyEnabled(bool $enabled): void
-    {
-        $this->button->setEnabled($enabled);
     }
 
     protected function applyLabel(string $label): void
@@ -58,6 +52,16 @@ class AppKitButton extends Button
         $this->recomposeTitle();
     }
 
+    protected function applyChecked(bool $checked): void
+    {
+        $this->button->setState($checked ? 1 : 0);
+    }
+
+    protected function applyEnabled(bool $enabled): void
+    {
+        $this->button->setEnabled($enabled);
+    }
+
     protected function applyTextColor(Color $color): void
     {
         $this->recomposeTitle();
@@ -68,16 +72,11 @@ class AppKitButton extends Button
         $this->recomposeTitle();
     }
 
-    /**
-     * A styled button title is an attributed string — AppKit's only path to
-     * colour and font on a button. Rebuilt whole on every change; the
-     * attributes dict carries live handles the ext resolves back to objects.
-     */
+    /** The attributed-title rebuild AppKitButton documents. */
     protected function recomposeTitle(): void
     {
-        // Boxes are held in locals through the calls that use their handles:
-        // a temp is freed the moment ->handle is read and the registry entry
-        // dies with it. Never chain ->handle off a temp.
+        // Boxes live in locals until AppKit has retained natively — never
+        // chain ->handle off a temp.
         $ns_color = is_null($this->text_color) ? null : $this->nsColor($this->text_color);
         $ns_font = is_null($this->font) ? null : $this->nsFont($this->font);
 
@@ -89,27 +88,15 @@ class AppKitButton extends Button
             $attributes['NSFont'] = $ns_font->handle;
         }
 
-        $title = NSAttributedString::initWithStringAttributes($this->button_label, $attributes);
+        $title = NSAttributedString::initWithStringAttributes($this->box_label, $attributes);
         if ($title instanceof NSAttributedString) {
             $this->button->setAttributedTitle($title->handle);
         }
     }
 
     /**
-     * Buttons have no background setter; the layer behind the bezel is the
-     * honest AppKit route. The layer CFRetains the CGColor, and the NSColor
-     * lives through this call — the raw bits are valid when read.
+     * A checkbox draws no fill of its own — the colour is ignored, the
+     * tick glyph is AppKit's.
      */
-    protected function applyBackground(Color $color): void
-    {
-        $this->button->setWantsLayer(true);
-        $layer = $this->button->layer();
-        if ($layer instanceof CALayer) {
-            // The NSColor must outlive the call: its CGColor is raw pointer
-            // bits into the colour object, and the layer only CFRetains once
-            // setBackgroundColor executes.
-            $ns_color = $this->nsColor($color);
-            $layer->setBackgroundColor($ns_color->CGColor());
-        }
-    }
+    protected function applyBackground(Color $color): void {}
 }

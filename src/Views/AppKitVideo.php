@@ -76,9 +76,14 @@ class AppKitVideo extends Video
         $this->player?->setMuted($muted);
     }
 
+    protected function applyVisible(bool $visible): void
+    {
+        $this->player_view->setHidden(! $visible);
+    }
+
     protected function applyFrame(int $x, int $y, int $width, int $height): void
     {
-        [, $content_height] = $this->window->contentSize();
+        [, $content_height] = $this->layoutSpace();
 
         $this->player_view->setFrame(new NSRect(
             (float) $x,

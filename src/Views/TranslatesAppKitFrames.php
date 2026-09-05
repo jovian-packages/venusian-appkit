@@ -17,7 +17,9 @@ trait TranslatesAppKitFrames
 
     protected function applyFrame(int $x, int $y, int $width, int $height): void
     {
-        [, $content_height] = $this->window->contentSize();
+        // Invert against the space the view lives in — the window content,
+        // or the hosting group's inner size when conjured into one.
+        [, $content_height] = $this->layoutSpace();
 
         $this->control()->setFrame(new NSRect(
             (float) $x,
@@ -38,5 +40,10 @@ trait TranslatesAppKitFrames
     protected function destroyNative(): void
     {
         $this->control()->removeFromSuperview();
+    }
+
+    protected function applyVisible(bool $visible): void
+    {
+        $this->control()->setHidden(! $visible);
     }
 }

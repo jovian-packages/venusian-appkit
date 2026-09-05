@@ -1,5 +1,30 @@
 # jovian/venusian-appkit Update Log
 
+## 2026-09-04 (visibility)
+* **Update**: `applyVisible(bool)` lands for Surface's new
+  `setVisible/show/hide`: NSView setHidden through both frame traits; AppKitSpinner/Video/TextArea/ScrollView write their own node. Hiding a container hides the subtree
+  natively.
+
+## 2026-09-03 (primitive wave + containers)
+* **Creation**: Eleven twins for Surface's new view kinds. Controls:
+  `AppKitTextInput` (NSTextField / NSSecureTextField; NSTextFieldDelegate
+  `controlTextDidChange:` for edits, Bridge action for Enter),
+  `AppKitTextArea` (NSTextView::scrollableTextView pair, NSTextViewDelegate
+  `textDidChange:`), `AppKitSlider` (continuous, Bridge action),
+  `AppKitToggle` (NSSwitch), `AppKitToggleButton` (PUSH_ON_PUSH_OFF) +
+  `AppKitCheckbox` (checkbox factory) with the attributed-title recompose,
+  `AppKitProgressBar` (BAR style, 0..1), `AppKitSeparator` (NSBox
+  NS_BOX_SEPARATOR), `AppKitDropdown` (NSPopUpButton, Bridge action).
+  Containers: `AppKitGroup` (plain NSView) and `AppKitScrollView`
+  (NSScrollView + NSView document, re-pinned to top per extent write —
+  the document is unflipped). New seam: `HostsAppKitChildren` — the
+  delegate's mints addSubview onto `childSurface()` when conjured `in:` a
+  container — and every inversion site now flips against
+  `View::layoutSpace()` (host inner height or window content), including
+  the existing trait, spinner and video. `TranslatesAppKitViewFrames` is
+  the NSView-fronted variant of the frame trait. Class-load verified;
+  live smoke owed.
+
 ## 2026-08-31 (video)
 * **Creation**: `AppKitVideo` over `AVPlayerView` (INLINE controls) with an `AVPlayer`
   minted per path from `NSURL::fileURLWithPath`. The AVPlayer box is a held property —

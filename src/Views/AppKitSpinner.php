@@ -37,7 +37,7 @@ class AppKitSpinner extends Spinner
 
     protected function applyFrame(int $x, int $y, int $width, int $height): void
     {
-        [, $content_height] = $this->window->contentSize();
+        [, $content_height] = $this->layoutSpace();
 
         $this->indicator->setFrame(new NSRect(
             (float) $x,
@@ -58,6 +58,11 @@ class AppKitSpinner extends Spinner
     protected function destroyNative(): void
     {
         $this->indicator->removeFromSuperview();
+    }
+
+    protected function applyVisible(bool $visible): void
+    {
+        $this->indicator->setHidden(! $visible);
     }
 
     /**

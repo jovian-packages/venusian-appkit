@@ -10,15 +10,14 @@ use Jovian\Bindings\AppKit\Runtime\Bridge;
 use Jovian\Bindings\AppKit\Runtime\ObjCObject;
 use Surface\Contracts\NativeWindows\Views\Color;
 use Surface\Contracts\NativeWindows\Views\FontSpec;
-use Surface\NativeWindows\Views\Button;
+use Surface\NativeWindows\Views\ToggleButton;
 use Surface\NativeWindows\Windowable;
 
 /**
- * A Surface button over an NSButton. The click goes through the bridge's
- * shared action target into fireClick(), so the sketch's hook runs inside
- * the pump that delivered the click.
+ * A Surface toggle button over an NSButton in the push-on/push-off type.
+ * The press lands in fireToggled() with the state AppKit holds.
  */
-class AppKitButton extends Button
+class AppKitToggleButton extends ToggleButton
 {
     use ComposesAppKitStyle;
     use TranslatesAppKitFrames;
@@ -27,24 +26,20 @@ class AppKitButton extends Button
         string $name,
         Windowable $window,
         string $label,
+        bool $pressed,
         public readonly NSButton $button,
     ) {
-        parent::__construct($name, $window, $label);
+        parent::__construct($name, $window, $label, $pressed);
 
         Bridge::setAction(
             $button->handle,
-            fn (ObjCObject $sender) => $this->fireClick(),
+            fn (ObjCObject $sender) => $this->fireToggled($this->button->state() === 1),
         );
     }
 
     protected function control(): NSControl
     {
         return $this->button;
-    }
-
-    protected function applyEnabled(bool $enabled): void
-    {
-        $this->button->setEnabled($enabled);
     }
 
     protected function applyLabel(string $label): void
@@ -58,6 +53,16 @@ class AppKitButton extends Button
         $this->recomposeTitle();
     }
 
+    protected function applyPressed(bool $pressed): void
+    {
+        $this->button->setState($pressed ? 1 : 0);
+    }
+
+    protected function applyEnabled(bool $enabled): void
+    {
+        $this->button->setEnabled($enabled);
+    }
+
     protected function applyTextColor(Color $color): void
     {
         $this->recomposeTitle();
@@ -69,15 +74,13 @@ class AppKitButton extends Button
     }
 
     /**
-     * A styled button title is an attributed string — AppKit's only path to
-     * colour and font on a button. Rebuilt whole on every change; the
-     * attributes dict carries live handles the ext resolves back to objects.
+     * The attributed-title rebuild AppKitButton documents — AppKit's only
+     * path to colour and font on a button title.
      */
     protected function recomposeTitle(): void
     {
-        // Boxes are held in locals through the calls that use their handles:
-        // a temp is freed the moment ->handle is read and the registry entry
-        // dies with it. Never chain ->handle off a temp.
+        // Boxes live in locals until AppKit has retained natively — never
+        // chain ->handle off a temp.
         $ns_color = is_null($this->text_color) ? null : $this->nsColor($this->text_color);
         $ns_font = is_null($this->font) ? null : $this->nsFont($this->font);
 
@@ -96,18 +99,13 @@ class AppKitButton extends Button
     }
 
     /**
-     * Buttons have no background setter; the layer behind the bezel is the
-     * honest AppKit route. The layer CFRetains the CGColor, and the NSColor
-     * lives through this call — the raw bits are valid when read.
+     * Same honest route as AppKitButton: the layer behind the bezel.
      */
     protected function applyBackground(Color $color): void
     {
         $this->button->setWantsLayer(true);
         $layer = $this->button->layer();
         if ($layer instanceof CALayer) {
-            // The NSColor must outlive the call: its CGColor is raw pointer
-            // bits into the colour object, and the layer only CFRetains once
-            // setBackgroundColor executes.
             $ns_color = $this->nsColor($color);
             $layer->setBackgroundColor($ns_color->CGColor());
         }
