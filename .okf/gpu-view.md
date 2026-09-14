@@ -14,6 +14,9 @@ sources:
   - id: mint
     resource: src/Windows/AppKitWindowDelegate.php
     title: AppKitWindowDelegate::mintGPU
+  - id: attach
+    resource: src/Views/AttachesAppKitEngines.php
+    title: AttachesAppKitEngines::attachEngine
   - id: spec
     resource: https://github.com/VenusianPHP/surface/blob/main/docs/superpowers/specs/2026-09-13-gpu-drawing-design.md
     title: GPU drawing slice 1 spec
@@ -21,15 +24,19 @@ sources:
 
 # Overview
 
-`mintGPU()` mints a host `NSView`, builds a `GPUHost` from
-`Bridge::pointerOf` of that view and `NSWindow::backingScaleFactor()`,
-and calls `$driver->attach($host)`.[^mint] The GPU engine (today:
+`mintGPU()` calls `AttachesAppKitEngines::attachEngine()`,[^attach]
+which mints a host `NSView`, builds a `GPUHost` from `Bridge::pointerOf`
+of that view and `NSWindow::backingScaleFactor()`, and calls
+`$driver->attach($host)`; `mintGPU()` then parents the view and builds
+the twin.[^mint] Stages use the same trait ([stage.md](/stage.md)). The GPU engine (today:
 venusian-metal, and venusian-vulkan through MoltenVK — any LAYER engine)
 returns a `GPUAttachment` with an executor and, when it renders through
 a layer, raw pointer bits plus a class name (`'CAMetalLayer'`). This
 package adopts those bits into AppKit's own registry and sets the layer
-on the view. A `layer_pointer <= 0` is an honest refusal:
+on the view. A `layer_pointer <= 0` is an engine error:
 `executor->release()` on the attachment, then
+`AppKitWindowException::engineReturnedNoLayer`. Only a refused kind
+(`VULKAN_SURFACE`, `HOST_WINDOW`) answers null, and `mintGPU()` throws
 `GPUViewException::unsupported($engine, 'appkit')`. AppKit never learns
 a third engine exists.
 
@@ -71,11 +78,12 @@ crashes.[^spec]
 
 # The GL route (slice 2)
 
-`mintGPU()` branches on `$driver->surfaceKind()`. `GL_CONTEXT` mints an
+`attachEngine()` branches on `$driver->surfaceKind()`. `GL_CONTEXT` mints an
 `NSOpenGLView` on a 4.1-core double-buffered `NSOpenGLPixelFormat`
 (`setWantsBestResolutionOpenGLSurface(true)` so the drawable is points ×
 scale), wraps it in `AppKitGLSurface`, passes that as `GPUHost->gl`,
-attaches, then builds `AppKitGLView` with the surface and the executor.
+attaches; `mintGPU()` parents the view after `attach()` and builds
+`AppKitGLView` with the surface and the executor.
 `makeCurrent()` re-checks that the context has a view until it does — a
 context with no view has no drawable. `applyFrame` calls
 `surface->update()` after `setFrame` so the context re-reads its drawable.
@@ -83,4 +91,5 @@ AppKit has no `drawRect:` callback for this; the tick drives frames.
 
 [^twin]: AppKitGPUView
 [^mint]: AppKitWindowDelegate::mintGPU
+[^attach]: AttachesAppKitEngines::attachEngine
 [^spec]: GPU drawing slice 1 spec

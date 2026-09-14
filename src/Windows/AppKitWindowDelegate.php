@@ -5,8 +5,6 @@ namespace Jovian\Venusian\AppKit\Windows;
 use Jovian\Bindings\AppKit\NS\NSApplication;
 use Jovian\Bindings\AppKit\NS\NSMenu;
 use Jovian\Bindings\AppKit\NS\NSMenuItem;
-use Jovian\Bindings\AppKit\NS\NSOpenGLPixelFormat;
-use Jovian\Bindings\AppKit\NS\NSOpenGLView;
 use Jovian\Bindings\AppKit\NS\NSButton;
 use Jovian\Bindings\AppKit\NS\NSTextField;
 use Jovian\Bindings\AppKit\NS\NSView;
@@ -38,13 +36,10 @@ use Jovian\Bindings\AppKit\NS\NSSwitch;
 use Jovian\Bindings\AppKit\NS\NSTableView;
 use Jovian\Bindings\AppKit\NS\NSTextView;
 use Jovian\Bindings\AppKit\Values\NSRect;
-use Jovian\Venusian\AppKit\Enums\NSOpenGLPixelFormatAttribute;
-use Jovian\Venusian\AppKit\Enums\NSOpenGLProfile;
 use Jovian\Venusian\AppKit\Views\AppKitButton;
 use Jovian\Venusian\AppKit\Views\AppKitCheckbox;
 use Jovian\Venusian\AppKit\Views\AppKitDatePicker;
 use Jovian\Venusian\AppKit\Views\AppKitDropdown;
-use Jovian\Venusian\AppKit\Views\AppKitGLSurface;
 use Jovian\Venusian\AppKit\Views\AppKitGLView;
 use Jovian\Venusian\AppKit\Views\AppKitGPUView;
 use Jovian\Venusian\AppKit\Views\AppKitGroup;
@@ -61,11 +56,10 @@ use Jovian\Venusian\AppKit\Views\AppKitTextInput;
 use Jovian\Venusian\AppKit\Views\AppKitToggle;
 use Jovian\Venusian\AppKit\Views\AppKitToggleButton;
 use Jovian\Venusian\AppKit\Views\AppKitVideo;
+use Jovian\Venusian\AppKit\Views\AttachesAppKitEngines;
 use Jovian\Venusian\AppKit\Views\HostsAppKitChildren;
 use Surface\Contracts\Core\AboutInfo;
 use Surface\Contracts\Drawing\GPUEngineDriver;
-use Surface\Contracts\Drawing\GPUHost;
-use Surface\Contracts\Drawing\SurfaceKind;
 use Surface\Contracts\NativeWindows\GPUViewException;
 use Surface\Contracts\NativeWindows\MacOSWindow;
 use Surface\Contracts\NativeWindows\Views\OSGroup;
@@ -94,6 +88,8 @@ use Surface\NativeWindows\Windowable;
 
 class AppKitWindowDelegate extends Windowable implements MacOSWindow
 {
+    use AttachesAppKitEngines;
+
     /**
      * The bar built from this window's elected profile, held for the later
      * focus-swap slice. macOS has one bar per process, so electing here means
@@ -612,103 +608,30 @@ class AppKitWindowDelegate extends Windowable implements MacOSWindow
     }
 
     /**
-     * Mint what the engine asks for: a plain NSView whose layer the engine
-     * hands back, or an NSOpenGLView whose context this side lends. Any
-     * other kind is an honest refusal.
-     *
-     * @throws GPUViewException When AppKit cannot mint that surface kind.
+     * A GPU region: AttachesAppKitEngines mints and attaches, this parents
+     * the view into the window content (or the hosting group) and builds the
+     * twin. Size is 0×0 at mint; the twin's applyFrame() sizes view and executor.
      */
     protected function mintGPU(string $name, GPUEngineDriver $driver, ?OSGroup $in): GPUView
     {
-        return match ($driver->surfaceKind()) {
-            SurfaceKind::LAYER => $this->mintLayerGPU($name, $driver, $in),
-            SurfaceKind::GL_CONTEXT => $this->mintGLGPU($name, $driver, $in),
-        };
-    }
-
-    /**
-     * 4.1 core, double-buffered, 24-bit colour; best-resolution surface so
-     * the drawable is points × scale. Order: native → surface → host → attach
-     * → twin, because GPUView's constructor takes the executor.
-     *
-     * @throws AppKitWindowException When AppKit will not mint the format or view.
-     */
-    private function mintGLGPU(string $name, GPUEngineDriver $driver, ?OSGroup $in): GPUView
-    {
-        $format = NSOpenGLPixelFormat::initWithAttributes([
-            NSOpenGLPixelFormatAttribute::OPENGL_PROFILE->value, NSOpenGLProfile::VERSION_4_1_CORE->value,
-            NSOpenGLPixelFormatAttribute::DOUBLE_BUFFER->value,
-            NSOpenGLPixelFormatAttribute::COLOR_SIZE->value, 24,
-            0,
-        ]);
-        if (! $format instanceof NSOpenGLPixelFormat) {
-            throw AppKitWindowException::viewMintFailed($name);
-        }
-
-        $view = NSOpenGLView::initWithFramePixelFormat(new NSRect(0.0, 0.0, 0.0, 0.0), $format->handle);
-        if (! $view instanceof NSOpenGLView) {
-            throw AppKitWindowException::viewMintFailed($name);
-        }
-        $view->setWantsBestResolutionOpenGLSurface(true);
-
-        $surface = $this->mintSurface($in);
-        $surface->addSubview($view->handle);
-
         $scale = $this->window->backingScaleFactor();
-        $gl = new AppKitGLSurface($view, $format);
-        $attachment = $driver->attach(new GPUHost(Bridge::pointerOf($view->handle), 0, 0, $scale, $gl));
-
-        return new AppKitGLView($name, $this, $driver->engine(), $attachment->executor, $scale, $gl, $this->window);
-    }
-
-    /**
-     * A plain NSView as the GPU host. The GPU engine attaches and hands
-     * back layer pointer bits; this side adopts them into AppKit's
-     * registry, wants a layer, and sets it. Boxes for the view and the
-     * adopted layer live on the twin. A missing layer is an honest
-     * refusal — AppKit will not host that engine.
-     *
-     * @throws AppKitWindowException When AppKit will not mint the view.
-     * @throws GPUViewException When the attachment carries no layer to adopt.
-     */
-    private function mintLayerGPU(string $name, GPUEngineDriver $driver, ?OSGroup $in): GPUView
-    {
-        $view = NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0));
-        if (! $view instanceof NSView) {
-            throw AppKitWindowException::viewMintFailed($name);
-        }
-
-        $scale = $this->window->backingScaleFactor();
-        $view_handle = $view->handle;
-        $host = new GPUHost(Bridge::pointerOf($view_handle), 0, 0, $scale);
-        $attachment = $driver->attach($host);
-        if ($attachment->layer_pointer <= 0) {
-            $attachment->executor->release();
+        $attached = $this->attachEngine($name, $driver, $scale, 0, 0);
+        if (is_null($attached)) {
             throw GPUViewException::unsupported($driver->engine()->value, 'appkit');
         }
 
-        $adopted = Bridge::adopt($attachment->layer_class, $attachment->layer_pointer);
-        $layer = ObjCObject::box($adopted);
-        if (is_null($layer)) {
-            throw AppKitWindowException::viewMintFailed($name);
+        $this->mintSurface($in)->addSubview($attached->view->handle);
+
+        if (! is_null($attached->gl)) {
+            return new AppKitGLView($name, $this, $driver->engine(), $attached->attachment->executor, $scale, $attached->gl, $this->window);
         }
 
-        $view->setWantsLayer(true);
-        $view->setLayer($layer->handle);
+        $layer = $attached->layer;
+        if (is_null($layer)) {
+            throw AppKitWindowException::engineReturnedNoLayer($name, $driver->engine()->value);
+        }
 
-        $surface = $this->mintSurface($in);
-        $surface->addSubview($view->handle);
-
-        return new AppKitGPUView(
-            $name,
-            $this,
-            $driver->engine(),
-            $attachment->executor,
-            $scale,
-            $view,
-            $layer,
-            $this->window,
-        );
+        return new AppKitGPUView($name, $this, $driver->engine(), $attached->attachment->executor, $scale, $attached->view, $layer, $this->window);
     }
 
     /**

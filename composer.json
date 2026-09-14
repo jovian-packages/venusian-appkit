@@ -30,6 +30,7 @@
         "surface/contracts": "^0.8.0",
         "surface/drawing": "^0.8.0",
         "surface/native-windows": "^0.8.0",
+        "surface/stage": "^0.8.0",
         "venusian-voyager/contracts": "^0.8.0"
     },
     "require-dev": {

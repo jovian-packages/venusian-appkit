@@ -1,6 +1,35 @@
 # jovian/venusian-appkit Update Log
 
 ## 2026-09-14
+* **Fix**: [stage.md](/stage.md) — an engine's `attach()` failure is
+  wrapped as inherited `AppKitStageException::attachFailed` (previous
+  kept); a `StageException` passes through. A failure after attach
+  (content view, delegate, stage ctor) releases the executor, closes the
+  window, and is `windowSetupFailed`.
+
+## 2026-09-14 (stage host)
+* **Creation**: [AppKitStageSession](/stage.md) — `stage.appkit` host.
+  Rides `BridgedMacOSSession` (same NSApp, `sharesNativePump()` true).
+  `AppKitStagedWindow`: content view is the engine surface;
+  `windowShouldClose:` → `closeRequested()`, answers false;
+  `windowDidResize:` → `nativeResized()` → `resized()`. New dep
+  `surface/stage`.
+* **Update**: [AppKitGPUView](/gpu-view.md) — `mintLayerGPU()` /
+  `mintGLGPU()` gone; `AttachesAppKitEngines::attachEngine()` returns
+  `?AppKitAttachment`, shared by `mintGPU()` and stages. `mintGPU()`
+  parents and builds the twin; null (refused kind) →
+  `GPUViewException::unsupported`; no layer →
+  `AppKitWindowException::engineReturnedNoLayer`. GL view parented after
+  `attach()`.
+* **Update**: [stage.md](/stage.md) — `destroyNative()` `off()`s both
+  delegate selectors.
+* **Creation**: `AppKitStageException extends StageException` —
+  `windowMintFailed`, `engineReturnedNoLayer`, `viewMintFailed`; inherited
+  `unsupported`. Trait hook `noLayerError()`: window exception by default,
+  stage exception in the stage session. Attach failures close the stage
+  window.
+
+## 2026-09-14
 * **Update**: [AppKitGPUView](/gpu-view.md) — layer engines are
   venusian-metal, and venusian-vulkan through MoltenVK. `mintLayerGPU()`
   is unchanged; any `LAYER` attach that answers `CAMetalLayer` bits is

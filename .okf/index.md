@@ -25,8 +25,11 @@ verifies it.
   what initialising, connecting, disconnecting and pumping each do, and the
   `NSWindow` factory hanging off it
 * [gpu-view.md](/gpu-view.md) - GPU hosts: adopt a Metal layer, or lend
-  an `NSOpenGLContext` via `AppKitGLSurface`; `mintGPU()` branches on
-  `SurfaceKind`
+  an `NSOpenGLContext` via `AppKitGLSurface`; `attachEngine()` branches
+  on `SurfaceKind`
+* [stage.md](/stage.md) - the `stage.appkit` host: whole engine-owned
+  `NSWindow`s riding the bridge pump; close asks; `windowDidResize:`
+  drives resize; `AttachesAppKitEngines` shared with GPU regions
 
 # Related bundles
 
@@ -41,5 +44,5 @@ verifies it.
 |---|---|
 | Version | 0.8.0, PHP `^8.4\|^8.5\|^8.6`, macOS only |
 | Namespace | `Jovian\Venusian\AppKit\` at `src/` |
-| Requires | `jovian/appkit`, `surface/bridge`, `surface/contracts`, `surface/drawing`, `surface/native-windows`, `venusian-voyager/contracts` |
-| Container alias | binds `mac.bridge` |
+| Requires | `jovian/appkit`, `surface/bridge`, `surface/contracts`, `surface/drawing`, `surface/native-windows`, `surface/stage`, `venusian-voyager/contracts` |
+| Container alias | binds `mac.bridge` and `stage.appkit` |

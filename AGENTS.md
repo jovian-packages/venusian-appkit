@@ -43,15 +43,18 @@ that shipped ahead of the decision, not settled policy. See
 
 - Composer: `jovian/venusian-appkit` **0.8.0**. PHP `^8.4|^8.5|^8.6`. macOS
   only. Requires `jovian/appkit`, `surface/bridge`, `surface/contracts`,
-  `surface/drawing`, `surface/native-windows`, `venusian-voyager/contracts`.
+  `surface/drawing`, `surface/native-windows`, `surface/stage`,
+  `venusian-voyager/contracts`.
 - Namespace root is `Jovian\Venusian\AppKit\` at `src/`.
-- **The provider binds `mac.bridge`.** That container alias is the entire
-  seam to Surface; installing this package is the whole of what makes macOS
-  windowing available. Do not rename it.
+- **The provider binds `mac.bridge` and `stage.appkit`.** Those container
+  aliases are the entire seam to Surface; installing this package is the
+  whole of what makes macOS windowing and AppKit stages available. Do not
+  rename them.
 - **Implement Surface's contracts, do not re-declare policy.** The abstract
   in `surface/bridge` owns guards, idempotency, and state. Fill the hooks.
 - **Exceptions subclass `Surface\Contracts\Bridge\BridgeException`** so a
-  sketch catches one type without naming AppKit.
+  sketch catches one type without naming AppKit. Stage-host failures are
+  `AppKitStageException extends Surface\Contracts\Stage\StageException`.
 - **Object parameters into `jovian/appkit` are `int` handles.** Pass
   `$obj->handle`; only returns and callback arguments come back boxed.
 - **Never chain `->handle` off a temp.** PHP frees a method-call temp the
@@ -77,8 +80,11 @@ that shipped ahead of the decision, not settled policy. See
   owns GL state. Never import `Jovian\Bindings\OpenGL` or
   `Jovian\Venusian\OpenGL`. Mint order is native → surface → `GPUHost->gl`
   → `attach()` → twin, because `GPUView`'s constructor takes the executor.
-- **`mintGPU()` decides by `SurfaceKind`, not by engine name.** `LAYER`
-  adopts; `GL_CONTEXT` lends; the enum is the whole decision.
+- **`attachEngine()` decides by `SurfaceKind`, not by engine name.**
+  `AttachesAppKitEngines` is the one attach path for GPU regions
+  (`mintGPU()`) and stages. `LAYER` adopts; `GL_CONTEXT` lends;
+  `VULKAN_SURFACE` / `HOST_WINDOW` answer null and the caller refuses. The
+  enum is the whole decision.
 - **`NS_OPTIONS` values stay `int`** because PHP enums cannot be OR'd. Build
   them from `SomeEnum::CASE->value | ...`.
 - **`setReleasedWhenClosed(false)` on every window.** AppKit would otherwise

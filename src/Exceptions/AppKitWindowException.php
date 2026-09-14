@@ -34,6 +34,14 @@ class AppKitWindowException extends WindowableException
     }
 
     /**
+     * A LAYER engine attached but handed back no layer to adopt.
+     */
+    public static function engineReturnedNoLayer(string $name, string $engine): static
+    {
+        return new static("The '{$engine}' engine returned no layer for '{$name}'.");
+    }
+
+    /**
      * AppKit answered with something that is not the view asked for.
      */
     public static function viewMintFailed(string $name): static
