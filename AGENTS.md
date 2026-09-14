@@ -29,9 +29,9 @@ packages are shape-parallel by design and share no code.
 
 ## Current state
 
-The OS bridge session and bare `NSWindow` provisioning exist. The 0.8 view
-drivers were written against an older, opinionated `ext-appkit` and were torn
-out; views inside the window come next.
+The OS bridge session, bare `NSWindow` provisioning, the nineteen Surface
+view twins, `AppKitGPUView` (layer) and `AppKitGLView` + `AppKitGLSurface` (OpenGL) exist. GPU layers are adopted on this side
+only — see [`.okf/gpu-view.md`](.okf/gpu-view.md).
 
 `provisionNewWindow()` mints with the style mask
 `TITLED|CLOSABLE|MINIATURIZABLE|RESIZABLE` and an origin of `(0, 0)` — the
@@ -43,7 +43,7 @@ that shipped ahead of the decision, not settled policy. See
 
 - Composer: `jovian/venusian-appkit` **0.8.0**. PHP `^8.4|^8.5|^8.6`. macOS
   only. Requires `jovian/appkit`, `surface/bridge`, `surface/contracts`,
-  `surface/native-windows`, `venusian-voyager/contracts`.
+  `surface/drawing`, `surface/native-windows`, `venusian-voyager/contracts`.
 - Namespace root is `Jovian\Venusian\AppKit\` at `src/`.
 - **The provider binds `mac.bridge`.** That container alias is the entire
   seam to Surface; installing this package is the whole of what makes macOS
@@ -61,6 +61,24 @@ that shipped ahead of the decision, not settled policy. See
   any call using pointer bits derived from it, like `CGColor()`). This was
   the menu-bar Heisenbug and the invisible label styling; proven headless
   on 2026-08-30.
+- **Adopt GPU layers on this side only.** venusian-metal hands pointer bits
+  and a class name (`'CAMetalLayer'`); this package calls
+  `Jovian\Bindings\AppKit\Runtime\Bridge::adopt` then `ObjCObject::box`.
+  Never import a `Jovian\Bindings\Metal` or `Jovian\Venusian\Metal` symbol
+  — the only crossing is `adopt(pointer bits)`. Each side owns one retain.
+- **Hold the GPU boxes.** The adopted layer box and the host `NSView` box
+  live on `AppKitGPUView` for the view's life. Same temp-box rule as
+  above. `applyFrame` resizes the executor in **pixels**
+  (`round(w × backingScaleFactor())`), not points.
+- **A GL surface lends its context and never draws.** `AppKitGLSurface`
+  holds the `NSOpenGLView`, `NSOpenGLPixelFormat` and `NSOpenGLContext`
+  boxes and answers `makeCurrent()` / `present()` / `drawableSize()`. The
+  twin owns placement, the surface owns the context, the engine's executor
+  owns GL state. Never import `Jovian\Bindings\OpenGL` or
+  `Jovian\Venusian\OpenGL`. Mint order is native → surface → `GPUHost->gl`
+  → `attach()` → twin, because `GPUView`'s constructor takes the executor.
+- **`mintGPU()` decides by `SurfaceKind`, not by engine name.** `LAYER`
+  adopts; `GL_CONTEXT` lends; the enum is the whole decision.
 - **`NS_OPTIONS` values stay `int`** because PHP enums cannot be OR'd. Build
   them from `SomeEnum::CASE->value | ...`.
 - **`setReleasedWhenClosed(false)` on every window.** AppKit would otherwise

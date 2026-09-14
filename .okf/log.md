@@ -1,5 +1,40 @@
 # jovian/venusian-appkit Update Log
 
+## 2026-09-14
+* **Update**: [AppKitGPUView](/gpu-view.md) — layer engines are
+  venusian-metal, and venusian-vulkan through MoltenVK. `mintLayerGPU()`
+  is unchanged; any `LAYER` attach that answers `CAMetalLayer` bits is
+  adopted the same way.
+
+## 2026-09-13
+* **Update**: [AppKitGPUView](/gpu-view.md) — the GL route: `mintGPU()` branches on `SurfaceKind`; `AppKitGLSurface` lends the `NSOpenGLContext`, `AppKitGLView` owns placement. Two package enums carry the cited `NSOpenGL.h` ints.
+
+## 2026-09-13 (GPU twin)
+* **Creation**: `AppKitGPUView` over a plain `NSView` whose layer is an
+  adopted `CAMetalLayer`. `mintGPU()` builds a `GPUHost` from
+  `Bridge::pointerOf` + `backingScaleFactor()`, calls
+  `$driver->attach()`, and — when `layer_pointer > 0` — `Bridge::adopt`
+  + `ObjCObject::box` + `setWantsLayer` / `setLayer`. The view and layer
+  boxes are held on the twin. `applyFrame` inverts y through
+  `layoutSpace()` and resizes the executor in pixels
+  (`round(w × scale)`). `destroyNative` only `removeFromSuperview`s —
+  Surface's `GPUView::remove()` already released the executor.
+  `layer_pointer <= 0` throws `GPUViewException::unsupported`. No Metal
+  import. New dep: `surface/drawing`. AGENTS gained the adopt-here and
+  hold-boxes rules. [gpu-view.md](/gpu-view.md) is `status: draft`.
+
+## 2026-09-12 (datePicker + table twins)
+* **Update**: `AppKitDatePicker` over `NSDatePicker` (`CLOCK_AND_CALENDAR`,
+  `YEAR_MONTH_DAY`, `SINGLE`); `Bridge::setAction` behind `applying`;
+  `NSDate` crosses as `Y-m-d` through a held `NSDateFormatter` in the
+  formatter's default time zone. `AppKitTable` over `NSScrollView` +
+  `NSTableView`; `NSTableViewDataSource` / `NSTableViewDelegate`; cells
+  are `NSTextField` labels; `selectRow` uses `NSIndexSet::indexSetWithIndex`
+  → `selectRowIndexesByExtendingSelection`. `tableView:viewForTableColumn:row:`
+  talks to the ext Bridge so the row index stays an int — jovian's
+  `boxArgument` would treat `1` as a live handle. `examples/smoke-widgets.php`
+  prints `SMOKE_WIDGETS_OK` on the Mac.
+
 ## 2026-09-04 (visibility)
 * **Update**: `applyVisible(bool)` lands for Surface's new
   `setVisible/show/hide`: NSView setHidden through both frame traits; AppKitSpinner/Video/TextArea/ScrollView write their own node. Hiding a container hides the subtree

@@ -5,6 +5,8 @@ namespace Jovian\Venusian\AppKit\Windows;
 use Jovian\Bindings\AppKit\NS\NSApplication;
 use Jovian\Bindings\AppKit\NS\NSMenu;
 use Jovian\Bindings\AppKit\NS\NSMenuItem;
+use Jovian\Bindings\AppKit\NS\NSOpenGLPixelFormat;
+use Jovian\Bindings\AppKit\NS\NSOpenGLView;
 use Jovian\Bindings\AppKit\NS\NSButton;
 use Jovian\Bindings\AppKit\NS\NSTextField;
 use Jovian\Bindings\AppKit\NS\NSView;
@@ -17,9 +19,14 @@ use Jovian\Bindings\AppKit\AV\AVPlayerView;
 use Jovian\Bindings\AppKit\Enums\AVPlayerViewControlsStyle;
 use Jovian\Bindings\AppKit\Enums\NSBoxType;
 use Jovian\Bindings\AppKit\Enums\NSButtonType;
+use Jovian\Bindings\AppKit\Enums\NSDatePickerElementFlags;
+use Jovian\Bindings\AppKit\Enums\NSDatePickerMode;
+use Jovian\Bindings\AppKit\Enums\NSDatePickerStyle;
 use Jovian\Bindings\AppKit\Enums\NSImageScaling;
 use Jovian\Bindings\AppKit\Enums\NSProgressIndicatorStyle;
 use Jovian\Bindings\AppKit\NS\NSBox;
+use Jovian\Bindings\AppKit\NS\NSDateFormatter;
+use Jovian\Bindings\AppKit\NS\NSDatePicker;
 use Jovian\Bindings\AppKit\NS\NSImage;
 use Jovian\Bindings\AppKit\NS\NSImageView;
 use Jovian\Bindings\AppKit\NS\NSPopUpButton;
@@ -28,11 +35,18 @@ use Jovian\Bindings\AppKit\NS\NSScrollView;
 use Jovian\Bindings\AppKit\NS\NSSecureTextField;
 use Jovian\Bindings\AppKit\NS\NSSlider;
 use Jovian\Bindings\AppKit\NS\NSSwitch;
+use Jovian\Bindings\AppKit\NS\NSTableView;
 use Jovian\Bindings\AppKit\NS\NSTextView;
 use Jovian\Bindings\AppKit\Values\NSRect;
+use Jovian\Venusian\AppKit\Enums\NSOpenGLPixelFormatAttribute;
+use Jovian\Venusian\AppKit\Enums\NSOpenGLProfile;
 use Jovian\Venusian\AppKit\Views\AppKitButton;
 use Jovian\Venusian\AppKit\Views\AppKitCheckbox;
+use Jovian\Venusian\AppKit\Views\AppKitDatePicker;
 use Jovian\Venusian\AppKit\Views\AppKitDropdown;
+use Jovian\Venusian\AppKit\Views\AppKitGLSurface;
+use Jovian\Venusian\AppKit\Views\AppKitGLView;
+use Jovian\Venusian\AppKit\Views\AppKitGPUView;
 use Jovian\Venusian\AppKit\Views\AppKitGroup;
 use Jovian\Venusian\AppKit\Views\AppKitImage;
 use Jovian\Venusian\AppKit\Views\AppKitLabel;
@@ -41,6 +55,7 @@ use Jovian\Venusian\AppKit\Views\AppKitScrollView;
 use Jovian\Venusian\AppKit\Views\AppKitSeparator;
 use Jovian\Venusian\AppKit\Views\AppKitSlider;
 use Jovian\Venusian\AppKit\Views\AppKitSpinner;
+use Jovian\Venusian\AppKit\Views\AppKitTable;
 use Jovian\Venusian\AppKit\Views\AppKitTextArea;
 use Jovian\Venusian\AppKit\Views\AppKitTextInput;
 use Jovian\Venusian\AppKit\Views\AppKitToggle;
@@ -48,13 +63,19 @@ use Jovian\Venusian\AppKit\Views\AppKitToggleButton;
 use Jovian\Venusian\AppKit\Views\AppKitVideo;
 use Jovian\Venusian\AppKit\Views\HostsAppKitChildren;
 use Surface\Contracts\Core\AboutInfo;
+use Surface\Contracts\Drawing\GPUEngineDriver;
+use Surface\Contracts\Drawing\GPUHost;
+use Surface\Contracts\Drawing\SurfaceKind;
+use Surface\Contracts\NativeWindows\GPUViewException;
 use Surface\Contracts\NativeWindows\MacOSWindow;
 use Surface\Contracts\NativeWindows\Views\OSGroup;
 use Surface\NativeWindows\Enums\MenuRole;
 use Surface\NativeWindows\Menus\MenuItemSpec;
 use Surface\NativeWindows\Views\Button;
 use Surface\NativeWindows\Views\Checkbox;
+use Surface\NativeWindows\Views\DatePicker;
 use Surface\NativeWindows\Views\Dropdown;
+use Surface\NativeWindows\Views\GPUView;
 use Surface\NativeWindows\Views\Group;
 use Surface\NativeWindows\Views\Image;
 use Surface\NativeWindows\Views\Label;
@@ -63,6 +84,7 @@ use Surface\NativeWindows\Views\ScrollView;
 use Surface\NativeWindows\Views\Separator;
 use Surface\NativeWindows\Views\Slider;
 use Surface\NativeWindows\Views\Spinner;
+use Surface\NativeWindows\Views\Table;
 use Surface\NativeWindows\Views\TextArea;
 use Surface\NativeWindows\Views\TextInput;
 use Surface\NativeWindows\Views\Toggle;
@@ -469,6 +491,63 @@ class AppKitWindowDelegate extends Windowable implements MacOSWindow
     }
 
     /**
+     * A graphical day picker: clock-and-calendar, year-month-day, single.
+     * The formatter lives with the twin so dateValue can speak Y-m-d.
+     * @throws AppKitWindowException When AppKit will not mint the picker.
+     */
+    protected function mintDatePicker(string $name, ?string $date, ?OSGroup $in): DatePicker
+    {
+        $picker = NSDatePicker::initWithFrame(new NSRect(0.0, 0.0, 280.0, 180.0));
+        if (! $picker instanceof NSDatePicker) {
+            throw AppKitWindowException::viewMintFailed($name);
+        }
+
+        $picker->setDatePickerStyle(NSDatePickerStyle::CLOCK_AND_CALENDAR);
+        $picker->setDatePickerElements(NSDatePickerElementFlags::NS_DATE_PICKER_ELEMENT_FLAG_YEAR_MONTH_DAY->value);
+        $picker->setDatePickerMode(NSDatePickerMode::SINGLE);
+
+        $formatter = NSDateFormatter::init();
+        if (! $formatter instanceof NSDateFormatter) {
+            throw AppKitWindowException::viewMintFailed($name);
+        }
+        $formatter->setDateFormat('yyyy-MM-dd');
+
+        $this->mintSurface($in)->addSubview($picker->handle);
+
+        return new AppKitDatePicker($name, $this, $date, $picker, $formatter);
+    }
+
+    /**
+     * An NSScrollView hosting an NSTableView. Columns and the data
+     * source / selection delegate are wired by AppKitTable.
+     *
+     * @param list<string> $columns
+     * @param list<list<string>> $rows
+     * @throws AppKitWindowException When AppKit will not mint the pair.
+     */
+    protected function mintTable(string $name, array $columns, array $rows, ?OSGroup $in): Table
+    {
+        $scroll = NSScrollView::initWithFrame(new NSRect(0.0, 0.0, 400.0, 220.0));
+        if (! $scroll instanceof NSScrollView) {
+            throw AppKitWindowException::viewMintFailed($name);
+        }
+
+        $table = NSTableView::initWithFrame(new NSRect(0.0, 0.0, 400.0, 220.0));
+        if (! $table instanceof NSTableView) {
+            throw AppKitWindowException::viewMintFailed($name);
+        }
+
+        $scroll->setDocumentView($table->handle);
+        $scroll->setHasVerticalScroller(true);
+        $scroll->setHasHorizontalScroller(true);
+        $scroll->setAutohidesScrollers(true);
+
+        $this->mintSurface($in)->addSubview($scroll->handle);
+
+        return new AppKitTable($name, $this, $columns, $rows, $scroll, $table);
+    }
+
+    /**
      * An NSBox in the separator type — AppKit orients the line from the
      * frame's aspect on its own.
      * @throws AppKitWindowException When AppKit will not mint the box.
@@ -530,6 +609,106 @@ class AppKitWindowDelegate extends Windowable implements MacOSWindow
         $this->mintSurface($in)->addSubview($scroll->handle);
 
         return new AppKitScrollView($name, $this, $scroll, $document);
+    }
+
+    /**
+     * Mint what the engine asks for: a plain NSView whose layer the engine
+     * hands back, or an NSOpenGLView whose context this side lends. Any
+     * other kind is an honest refusal.
+     *
+     * @throws GPUViewException When AppKit cannot mint that surface kind.
+     */
+    protected function mintGPU(string $name, GPUEngineDriver $driver, ?OSGroup $in): GPUView
+    {
+        return match ($driver->surfaceKind()) {
+            SurfaceKind::LAYER => $this->mintLayerGPU($name, $driver, $in),
+            SurfaceKind::GL_CONTEXT => $this->mintGLGPU($name, $driver, $in),
+        };
+    }
+
+    /**
+     * 4.1 core, double-buffered, 24-bit colour; best-resolution surface so
+     * the drawable is points × scale. Order: native → surface → host → attach
+     * → twin, because GPUView's constructor takes the executor.
+     *
+     * @throws AppKitWindowException When AppKit will not mint the format or view.
+     */
+    private function mintGLGPU(string $name, GPUEngineDriver $driver, ?OSGroup $in): GPUView
+    {
+        $format = NSOpenGLPixelFormat::initWithAttributes([
+            NSOpenGLPixelFormatAttribute::OPENGL_PROFILE->value, NSOpenGLProfile::VERSION_4_1_CORE->value,
+            NSOpenGLPixelFormatAttribute::DOUBLE_BUFFER->value,
+            NSOpenGLPixelFormatAttribute::COLOR_SIZE->value, 24,
+            0,
+        ]);
+        if (! $format instanceof NSOpenGLPixelFormat) {
+            throw AppKitWindowException::viewMintFailed($name);
+        }
+
+        $view = NSOpenGLView::initWithFramePixelFormat(new NSRect(0.0, 0.0, 0.0, 0.0), $format->handle);
+        if (! $view instanceof NSOpenGLView) {
+            throw AppKitWindowException::viewMintFailed($name);
+        }
+        $view->setWantsBestResolutionOpenGLSurface(true);
+
+        $surface = $this->mintSurface($in);
+        $surface->addSubview($view->handle);
+
+        $scale = $this->window->backingScaleFactor();
+        $gl = new AppKitGLSurface($view, $format);
+        $attachment = $driver->attach(new GPUHost(Bridge::pointerOf($view->handle), 0, 0, $scale, $gl));
+
+        return new AppKitGLView($name, $this, $driver->engine(), $attachment->executor, $scale, $gl, $this->window);
+    }
+
+    /**
+     * A plain NSView as the GPU host. The GPU engine attaches and hands
+     * back layer pointer bits; this side adopts them into AppKit's
+     * registry, wants a layer, and sets it. Boxes for the view and the
+     * adopted layer live on the twin. A missing layer is an honest
+     * refusal — AppKit will not host that engine.
+     *
+     * @throws AppKitWindowException When AppKit will not mint the view.
+     * @throws GPUViewException When the attachment carries no layer to adopt.
+     */
+    private function mintLayerGPU(string $name, GPUEngineDriver $driver, ?OSGroup $in): GPUView
+    {
+        $view = NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0));
+        if (! $view instanceof NSView) {
+            throw AppKitWindowException::viewMintFailed($name);
+        }
+
+        $scale = $this->window->backingScaleFactor();
+        $view_handle = $view->handle;
+        $host = new GPUHost(Bridge::pointerOf($view_handle), 0, 0, $scale);
+        $attachment = $driver->attach($host);
+        if ($attachment->layer_pointer <= 0) {
+            $attachment->executor->release();
+            throw GPUViewException::unsupported($driver->engine()->value, 'appkit');
+        }
+
+        $adopted = Bridge::adopt($attachment->layer_class, $attachment->layer_pointer);
+        $layer = ObjCObject::box($adopted);
+        if (is_null($layer)) {
+            throw AppKitWindowException::viewMintFailed($name);
+        }
+
+        $view->setWantsLayer(true);
+        $view->setLayer($layer->handle);
+
+        $surface = $this->mintSurface($in);
+        $surface->addSubview($view->handle);
+
+        return new AppKitGPUView(
+            $name,
+            $this,
+            $driver->engine(),
+            $attachment->executor,
+            $scale,
+            $view,
+            $layer,
+            $this->window,
+        );
     }
 
     /**
