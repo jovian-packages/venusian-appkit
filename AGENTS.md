@@ -43,13 +43,16 @@ that shipped ahead of the decision, not settled policy. See
 
 - Composer: `jovian/venusian-appkit` **0.8.0**. PHP `^8.4|^8.5|^8.6`. macOS
   only. Requires `jovian/appkit`, `surface/bridge`, `surface/contracts`,
-  `surface/drawing`, `surface/native-windows`, `surface/stage`,
-  `venusian-voyager/contracts`.
+  `surface/drawing`, `surface/human-input`, `surface/native-windows`,
+  `surface/stage`, `venusian-voyager/contracts`.
 - Namespace root is `Jovian\Venusian\AppKit\` at `src/`.
-- **The provider binds `mac.bridge` and `stage.appkit`.** Those container
-  aliases are the entire seam to Surface; installing this package is the
-  whole of what makes macOS windowing and AppKit stages available. Do not
-  rename them.
+- **The provider binds `mac.bridge`, `stage.appkit` and `input.appkit`.**
+  Those container aliases are the entire seam to Surface; installing this
+  package is the whole of what makes macOS windowing, AppKit stages and
+  AppKit input available. Do not rename them.
+- **The input engine never pumps.** The ext's NSEvent tap records while
+  `os` pumps NSApp; `input.appkit` only drains. See
+  [`.okf/input-engine.md`](.okf/input-engine.md).
 - **Implement Surface's contracts, do not re-declare policy.** The abstract
   in `surface/bridge` owns guards, idempotency, and state. Fill the hooks.
 - **Exceptions subclass `Surface\Contracts\Bridge\BridgeException`** so a
@@ -102,7 +105,9 @@ that shipped ahead of the decision, not settled policy. See
 ## Verification
 
 Needs a Mac with `ext-appkit` loaded. Pure-logic code should be covered by
-Pest with no extension present; anything that touches AppKit is proven by
+Pest with no extension present (`../../venusian/surface/vendor/bin/pest`
+from this repo root when there is no local vendor; fakes in
+`tests/Support`); anything that touches AppKit is proven by
 running it, not by a skipped test reporting success.
 
 The standing acceptance check for the bridge: connect raises a Dock icon

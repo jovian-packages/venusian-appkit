@@ -29,6 +29,7 @@
         "surface/bridge": "^0.8.0",
         "surface/contracts": "^0.8.0",
         "surface/drawing": "^0.8.0",
+        "surface/human-input": "^0.8.0",
         "surface/native-windows": "^0.8.0",
         "surface/stage": "^0.8.0",
         "venusian-voyager/contracts": "^0.8.0"
@@ -43,7 +44,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Venusian\\Tests\\": "tests/"
+            "Venusian\\AppKit\\Tests\\": "tests/"
         }
     },
     "config": {
@@ -54,7 +55,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-master": "0.8.x-dev"
+            "dev-main": "0.8.x-dev"
         },
         "venusian": {
             "providers": [

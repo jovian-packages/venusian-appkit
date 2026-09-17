@@ -1,5 +1,24 @@
 # jovian/venusian-appkit Update Log
 
+## 2026-09-17 (input fixes)
+* **Update**: [input-engine.md](/input-engine.md) — wheel negated when
+  `isDirectionInvertedFromDevice` (physical wheel); key repeats still
+  append text; held sided modifiers released when an event shows their
+  device bit clear; new `AppActivity` seam (`NativeAppActivity`,
+  `NSApplicationDidResignActiveNotification`) → release-all on the next
+  poll; `WindowSpace` entries gain `content_width`, `window()` null
+  outside the content. Engine ctor gains the `AppActivity` argument.
+
+## 2026-09-17
+* **Creation**: [input-engine.md](/input-engine.md) — `AppKitInputEngine`
+  behind `input.appkit`. Seams `InputTap` (`ExtInputTap`), `GamepadSource`
+  (`GameControllerSource`), `WindowSpace` (`NativeWindowSpace`).
+  `KeyCodeMap` (kVK → `Key`), device-bit modifiers, y flip against content
+  height, precise-scroll ÷10, GC extended / micro mapping with stick Y
+  negated. `AppKitInputException extends HumanInputException`. New dep
+  `surface/human-input`. Ext-free Pest harness (`phpunit.xml`,
+  `tests/bootstrap.php`).
+
 ## 2026-09-14
 * **Fix**: [stage.md](/stage.md) — an engine's `attach()` failure is
   wrapped as inherited `AppKitStageException::attachFailed` (previous
@@ -167,3 +186,6 @@
 * **Creation**: [BridgedMacOSSession](/session.md) — the four AppKit hooks behind
   Surface's bridge lifecycle, why `finishLaunching()` is the unrepeatable half and
   activation policy is the cyclable one, and the deliberate absence of teardown.
+
+## 2026-09-17
+* **Update**: [input-engine](/input-engine.md) — each poll hands the tap the native window numbers (`swallowKeysIn`, only on change): keys no view takes are consumed after recording, so AppKit does not beep.

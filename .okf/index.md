@@ -30,6 +30,9 @@ verifies it.
 * [stage.md](/stage.md) - the `stage.appkit` host: whole engine-owned
   `NSWindow`s riding the bridge pump; close asks; `windowDidResize:`
   drives resize; `AttachesAppKitEngines` shared with GPU regions
+* [input-engine.md](/input-engine.md) - the `input.appkit` engine: NSEvent
+  tap for keys and mouse, GameController for pads, key-code and
+  device-bit tables, y flip, no pump of its own
 
 # Related bundles
 
@@ -44,5 +47,5 @@ verifies it.
 |---|---|
 | Version | 0.8.0, PHP `^8.4\|^8.5\|^8.6`, macOS only |
 | Namespace | `Jovian\Venusian\AppKit\` at `src/` |
-| Requires | `jovian/appkit`, `surface/bridge`, `surface/contracts`, `surface/drawing`, `surface/native-windows`, `surface/stage`, `venusian-voyager/contracts` |
-| Container alias | binds `mac.bridge` and `stage.appkit` |
+| Requires | `jovian/appkit`, `surface/bridge`, `surface/contracts`, `surface/drawing`, `surface/human-input`, `surface/native-windows`, `surface/stage`, `venusian-voyager/contracts` |
+| Container alias | binds `mac.bridge`, `stage.appkit` and `input.appkit` |
