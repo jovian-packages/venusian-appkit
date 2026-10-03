@@ -1,6 +1,6 @@
 {
     "name": "jovian/venusian-appkit",
-    "description": "AppKit toolkit driver for the Venusian Surface bridge: connects PHP to NSApplication through ext-appkit.",
+    "description": "AppKit toolkit driver for the Venusian Surface bridge: connects PHP to NSApplication, opens its windows and builds their menu bars through ext-appkit.",
     "type": "library",
     "keywords": [
         "framework",
@@ -27,10 +27,13 @@
         "ext-appkit": "^0.10",
         "venusian-surface/bridge": "^0.10.0",
         "venusian-surface/contracts": "^0.10.0",
+        "venusian-surface/windows": "^0.10.0",
         "venusian-voyager/nuts-and-bolts": "^0.10.1"
     },
     "require-dev": {
-        "pestphp/pest": "^4"
+        "pestphp/pest": "^4",
+        "venusian-voyager/config": "^0.10.1",
+        "venusian-voyager/vessel": "^0.10.1"
     },
     "autoload": {
         "psr-4": {
