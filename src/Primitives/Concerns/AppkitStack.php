@@ -12,10 +12,12 @@ use Surface\Contracts\Windows\Primitives\Align;
 use Surface\Contracts\Windows\Primitives\TKPrimitive as Child;
 
 /**
- * Column and row over NSStackView. Gravity-area distribution keeps every arranged view at its
- * natural size, packed from the start, with the leftover space empty; a view whose content
- * hugging is low on the main axis grows into it, and the children that fill share the space
- * equally (Qt's stretch 1 each). A filling child aligned START, CENTER or END on the main axis
+ * Column and row over NSStackView. With no filling child, gravity-area distribution keeps every
+ * arranged view at its natural size, packed from the start, with the leftover space empty. With
+ * one, fill distribution leaves no gap to keep, so the leftover goes to the filling children,
+ * whose main-axis hugging is the lowest, and they share it equally (Qt's stretch 1 each). Under
+ * gravity areas a filler would only tie with its stack's own gap hugging, and a nested filler
+ * would lose that tie as often as win it. A filling child aligned START, CENTER or END on the main axis
  * is arranged as a slot that takes the space, with the child placed inside it. No stack
  * alignment: each child is placed across the axis by its own constraints, inside the padding.
  */
@@ -143,7 +145,8 @@ trait AppkitStack
     /**
      * Every live, visible child that fills the main axis takes the same length as the first,
      * at a priority above their hugging and below compression resistance, so the spare space
-     * is shared equally and each still keeps its minimum.
+     * is shared equally and each still keeps its minimum. Fill distribution while any child
+     * fills, gravity areas otherwise.
      * @return void
      */
     protected function tie(): void
@@ -157,6 +160,7 @@ trait AppkitStack
             $this->children,
             fn (Child $child): bool => ! $child->isRemoved() && $child->isVisible() && $child->nativeFills(! $vertical),
         ));
+        $this->native->setDistribution($fillers === [] ? NSStackViewDistribution::GRAVITY_AREAS : NSStackViewDistribution::FILL);
         foreach (array_slice($fillers, 1) as $filler) {
             $tie = self::nativeOf($filler)->$length()->constraintEqualToAnchor(self::nativeOf($fillers[0])->$length());
             $tie->setPriority(200.0);

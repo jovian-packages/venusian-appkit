@@ -286,6 +286,37 @@ it('shares spare space equally between filling siblings', function (): void {
         ->and($left->size()[0])->toBeGreaterThan(150);
 });
 
+it('gives a filling column beside a hugging one every spare point of its row', function (): void {
+    $window = driver()->open('main', 900, 400);
+    $shell = $window->column('shell');
+    $body = $shell->row('body');
+    $body->fill();
+    $nav = $body->column('nav', 6, 12);
+    $nav->minSize(180, 0);
+    $nav->toggleButton('tab', 'Tab');
+    $body->separator('divider', horizontal: false);
+    $deck = $body->column('deck');
+    $deck->fill();
+    $hidden = $deck->column('hidden');
+    $hidden->fill();
+    $hidden->hide();
+    $screen = $deck->column('screen', 10, 16);
+    $screen->fill();
+    $form = $screen->row('form', 10);
+    $form->textInput('query', 'ISS')->minSize(260, 0);
+    $form->button('go', 'Go');
+    $table = $screen->textArea('table')->fill();
+    $window->present();
+    pumpFor(0.2);
+
+    [$nav_width] = $nav->size();
+    [$divider_width] = $body->view('divider')->size();
+    expect($nav_width)->toBeLessThan(260)
+        ->and($nav_width + $divider_width + $deck->size()[0])->toBeGreaterThanOrEqual(899)
+        ->and($screen->size()[0])->toBe($deck->size()[0])
+        ->and($table->size()[0])->toBe($deck->size()[0] - 32);
+});
+
 it('keeps a wrapping label readable inside containers that do not fill', function (): void {
     $window = driver()->open('main', 300, 200);
     $row = $window->column('m')->row('r');
