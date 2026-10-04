@@ -5,7 +5,7 @@ description: "AppKit concretes of Surface's TK primitives: factory, the shared n
 resource: src/Primitives/
 tags: [appkit, primitives, autolayout, layout]
 status: draft
-generated: { by: claude-opus/5.5, at: 2026-10-02T23:09:40Z }
+generated: { by: claude-opus/5.5, at: 2026-10-04T03:07:51Z }
 sources:
   - id: trait
     resource: src/Primitives/Concerns/AppkitPrimitive.php
@@ -76,6 +76,7 @@ Hugging only acts on an intrinsic size. A view without one hugs through the 480 
 | Label | `NSTextField::labelWithString`; wrap = word wrapping, 0 lines, horizontal compression 250; unwrap/null colour restore what AppKit built | — |
 | Button | push `NSButton`, text colour = content tint | ButtonClicked (target) |
 | Image | layer-backed `NSView`, image as layer contents, clipped; FIT/FILL/CENTER/STRETCH = kCAGravity resizeAspect/resizeAspectFill/center/resize. Natural size = NSImage point size (PNG dpi honoured). Unreadable file → WindowException; refused `setFile()` keeps `file()` | — |
+| Canvas | layer-backed `NSView`, gravity resize, clipped, no natural size. `present()` → `CFData` → `CGDataProvider` → `CGImage` (sRGB, 8 bits a channel, `kCGImageAlphaNoneSkipLast` + big-endian byte order: RGBA bytes, alpha skipped) → layer contents. Scale = window `backingScaleFactor`. |
 | Separator | `NSBox` SEPARATOR, built long in its direction, 1pt thick | — |
 | Spinner | `NSProgressIndicator` SPINNING, hidden when stopped | — |
 | Progress bar | `NSProgressIndicator` BAR 0..1; null = indeterminate, animating | — |

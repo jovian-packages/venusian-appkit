@@ -7,6 +7,7 @@ use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
 use Surface\Contracts\Windows\Primitives\Placement;
 use Surface\Contracts\Windows\Primitives\PrimitiveFactory;
 use Surface\Contracts\Windows\Primitives\TKButton;
+use Surface\Contracts\Windows\Primitives\TKCanvas;
 use Surface\Contracts\Windows\Primitives\TKCheckbox;
 use Surface\Contracts\Windows\Primitives\TKColumn;
 use Surface\Contracts\Windows\Primitives\TKDatepicker;
@@ -53,6 +54,11 @@ class AppkitPrimitiveFactory implements PrimitiveFactory
     public function mintImage(TKPrimitiveGroup $host, string $name, ?string $file): TKImage
     {
         return new AppkitImage($name, $this->window, $host, $this->placement($host), $file);
+    }
+
+    public function mintCanvas(TKPrimitiveGroup $host, string $name): TKCanvas
+    {
+        return new AppkitCanvas($name, $this->window, $host, $this->placement($host));
     }
 
     public function mintSeparator(TKPrimitiveGroup $host, string $name, bool $horizontal): TKSeparator
