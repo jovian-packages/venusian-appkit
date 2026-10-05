@@ -18,7 +18,9 @@ use Surface\Windows\Primitives\TKPrimitiveGroup;
 /**
  * A layer-backed view whose layer contents are the canvas's pixels: each present() wraps the
  * framebuffer's RGBA8 bytes in a CGImage (sRGB, the fourth byte skipped, so opaque) and sets it
- * as the contents, stretched over the bounds. The view has no natural size: the layout sizes it.
+ * as the contents, stretched over the bounds. An ext-fb framebuffer never becomes a string:
+ * its memory is copied by address into the CFData the image reads. The view has no natural
+ * size: the layout sizes it.
  */
 class AppkitCanvas extends TKCanvas
 {
@@ -45,8 +47,23 @@ class AppkitCanvas extends TKCanvas
      */
     protected function applyPixels(string $rgba8, int $width, int $height): void
     {
+        $this->showData(CFData::create($rgba8), $width, $height);
+    }
+
+    protected function applyAddress(int $address, int $width, int $height, int $stride, array $damage): void
+    {
+        $this->showData(CFData::create($address, $stride * $height), $width, $height);
+    }
+
+    /**
+     * The image over $data as the layer's contents.
+     *
+     * @throws WindowException When Core Graphics refuses the image.
+     */
+    private function showData(CFData $data, int $width, int $height): void
+    {
         self::$space ??= CGColorSpace::createWithName(kCGColorSpaceSRGB);
-        $provider = CGDataProvider::createWithCFData(CFData::create($rgba8));
+        $provider = CGDataProvider::createWithCFData($data);
         $image = is_null($provider) ? null : CGImage::create(
             $width, $height, 8, 32, $width * 4, self::$space,
             kCGImageAlphaNoneSkipLast | kCGBitmapByteOrder32Big, $provider, true, kCGRenderingIntentDefault,

@@ -1,5 +1,9 @@
 # Log
 
+## 2026-10-04
+
+* `AppkitCanvas` pipes an ext-fb framebuffer: `CFData::create` reads its memory by address, so no pixel byte passes through PHP. [primitives](architecture/primitives.md)
+
 ## 2026-10-03
 
 * `AppkitCanvas`: the framebuffer a `TKCanvas` hands out, shown as layer contents. [primitives](architecture/primitives.md)
