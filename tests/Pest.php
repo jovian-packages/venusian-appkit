@@ -6,6 +6,11 @@ use Jovian\Toolkits\Appkit\Bridge\AppkitBridgeDriver;
 use Jovian\Toolkits\Appkit\Bridge\AppkitSession;
 use Surface\Bridge\ToolkitManager;
 use Surface\Bridge\ToolkitPump;
+use Surface\Contracts\Drawing\LentSurface;
+use Surface\Contracts\Drawing\SurfaceBorrower;
+use Surface\Contracts\Framebuffers\FormatSpec;
+use Surface\Contracts\Framebuffers\Framebuffer;
+use Surface\Framebuffers\Native\NativeDirtyFramebuffer;
 use Surface\Windows\ToolkitWindowManager;
 use Voyager\Config\Repository;
 use Voyager\Vessel\ControlPanel;
@@ -104,4 +109,35 @@ function choose(NSMenuItem $item): void
 {
     $menu = $item->menu();
     $menu->performActionForItemAtIndex($menu->indexOfItem($item));
+}
+
+/** A borrower that keeps what it was asked to present into; its framebuffer is a plain dirty one. */
+final class LayerBorrower implements SurfaceBorrower
+{
+    /** @var list<LentSurface> */
+    public array $presented = [];
+
+    public Framebuffer $frame;
+
+    public function __construct()
+    {
+        $this->frame = new NativeDirtyFramebuffer(FormatSpec::rgba8(), 8, 8);
+    }
+
+    public function framebuffer(): Framebuffer
+    {
+        return $this->frame;
+    }
+
+    public function lendingHandles(): array
+    {
+        return [];
+    }
+
+    public function presentInto(LentSurface $surface): bool
+    {
+        $this->presented[] = $surface;
+
+        return true;
+    }
 }
