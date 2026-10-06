@@ -21,10 +21,10 @@ sources:
 
 | Hook | AppKit calls |
 |---|---|
-| initialize (once) | `NSApplication::sharedApplication()`, `finishLaunching()` |
+| initialize (once) | `NSApplication::sharedApplication()`; an empty `ObjCDelegate('NSApplicationDelegate')` as its delegate when it has none (held by the session; SDL video takes an empty slot); `finishLaunching()` |
 | connect | activation policy `REGULAR` (Dock icon, app switcher), `activateIgnoringOtherApps(true)` |
 | disconnect | activation policy `PROHIBITED`: headless, windows untouched |
-| `pump($ns)` | `nextEventMatchingMask(ANY, until, default mode, dequeue)` + `sendEvent`; first wait ends at `now + budget`, rest at `distantPast` (drain); then `updateWindows()` |
+| `pump($ns)` | `nextEventMatchingMask(ANY, until, default mode, dequeue)` + `sendEvent`; first wait ends at `now + budget`, rest at `distantPast` (drain); then `updateWindows()`, then `AppkitCanvas::sweepSdlWindows()` |
 
 `activateIgnoringOtherApps`, not `activate`: macOS declines the cooperative request for a terminal-launched process, and no window of an inactive app becomes key.[^session]
 

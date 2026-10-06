@@ -5,6 +5,7 @@ namespace Jovian\Toolkits\Appkit\Bridge;
 use CFFileDescriptor;
 use CFRunLoop;
 use CFRunLoopSource;
+use Jovian\Toolkits\Appkit\Primitives\AppkitCanvas;
 use NSApplication;
 use NSApplicationActivationPolicy;
 use NSDate;
@@ -12,6 +13,7 @@ use NSEvent;
 use NSEventMask;
 use NSEventType;
 use NSPoint;
+use ObjCDelegate;
 use Surface\Bridge\BridgedToolkitSession;
 
 class AppkitSession extends BridgedToolkitSession
@@ -21,6 +23,14 @@ class AppkitSession extends BridgedToolkitSession
      * @var NSApplication|null
      */
     protected ?NSApplication $application = null;
+
+    /**
+     * The application's delegate when it had none: a trampoline answering no selector, so AppKit
+     * behaves as with no delegate while the slot is taken. SDL's video subsystem makes itself the
+     * delegate (and the URL event handler) of an application that has none. AppKit holds it weakly.
+     * @var ObjCDelegate|null
+     */
+    protected ?ObjCDelegate $delegate = null;
 
     /**
      * The loop's waiter descriptor as a run-loop source, while joined.
@@ -40,6 +50,10 @@ class AppkitSession extends BridgedToolkitSession
     protected function initializeEngine(): void
     {
         $this->application = NSApplication::sharedApplication();
+        if (is_null($this->application->delegate())) {
+            $this->delegate = new ObjCDelegate('NSApplicationDelegate');
+            $this->application->setDelegate($this->delegate);
+        }
         $this->application->finishLaunching();
     }
 
@@ -87,6 +101,7 @@ class AppkitSession extends BridgedToolkitSession
             $until = NSDate::distantPast();
         }
         $this->application->updateWindows();
+        AppkitCanvas::sweepSdlWindows();
 
         return $dispatched;
     }
