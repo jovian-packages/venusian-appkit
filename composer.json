@@ -24,9 +24,10 @@
     ],
     "require": {
         "php": "^8.4|^8.5|^8.6",
-        "ext-appkit": "^0.10",
+        "ext-appkit": "^0.10.3",
         "venusian-surface/bridge": "^0.10.0",
         "venusian-surface/contracts": "^0.10.0",
+        "venusian-surface/human-input": "^0.10.0",
         "venusian-surface/windows": "^0.10.0",
         "venusian-voyager/nuts-and-bolts": "^0.10.1"
     },
@@ -34,6 +35,7 @@
         "jovian/venusian-metal": "^0.10.0",
         "jovian/venusian-opengl": "^0.10.0",
         "jovian/venusian-sdl3": "^0.10.0",
+        "jovian/venusian-vulkan": "^0.10.0",
         "pestphp/pest": "^4",
         "venusian-surface/drawing": "^0.10.0",
         "venusian-surface/fonts": "^0.10.0",
@@ -43,7 +45,8 @@
     "suggest": {
         "ext-metal": "A canvas lends a CAMetalLayer to the 'metal' rendering engine (jovian/venusian-metal) when ext-metal is loaded.",
         "ext-opengl": "A canvas lends an NSOpenGLView's context to the 'opengl' rendering engine (jovian/venusian-opengl) when ext-opengl is loaded.",
-        "ext-sdl3": "With ext-metal, a canvas lends an SDL window over its NSWindow to the 'sdl3' rendering engine (jovian/venusian-sdl3) when ext-sdl3 is loaded."
+        "ext-sdl3": "With ext-metal, a canvas lends an SDL window over its NSWindow to the 'sdl3' rendering engine (jovian/venusian-sdl3) when ext-sdl3 is loaded.",
+        "ext-vulkan": "With ext-metal, the 'vulkan' engine (jovian/venusian-vulkan) presents into the canvas's CAMetalLayer through MoltenVK."
     },
     "autoload": {
         "psr-4": {

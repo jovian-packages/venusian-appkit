@@ -16,6 +16,7 @@ use Surface\Contracts\Windows\Primitives\TKFixed;
 use Surface\Contracts\Windows\Primitives\TKGrid;
 use Surface\Contracts\Windows\Primitives\TKImage;
 use Surface\Contracts\Windows\Primitives\TKLabel;
+use Surface\Contracts\Windows\Primitives\TKLink;
 use Surface\Contracts\Windows\Primitives\TKPrimitiveGroup;
 use Surface\Contracts\Windows\Primitives\TKProgressBar;
 use Surface\Contracts\Windows\Primitives\TKRow;
@@ -44,6 +45,11 @@ class AppkitPrimitiveFactory implements PrimitiveFactory
     public function mintLabel(TKPrimitiveGroup $host, string $name, string $text): TKLabel
     {
         return new AppkitLabel($name, $this->window, $host, $this->placement($host), $text);
+    }
+
+    public function mintLink(TKPrimitiveGroup $host, string $name, string $text, string $url): TKLink
+    {
+        return new AppkitLink($name, $this->window, $host, $this->placement($host), $text, $url);
     }
 
     public function mintButton(TKPrimitiveGroup $host, string $name, string $label): TKButton

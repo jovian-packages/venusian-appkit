@@ -18,10 +18,21 @@ use Surface\Windows\Menus\MenuProfile;
 /**
  * A menu profile built once into an NSMenu tree. macOS has one bar per app, so the window
  * that is key installs its own; the first folder is the app menu, which AppKit titles with
- * the process name. Every item posts mail; About shows the standard panel.
+ * the process name. Every item posts mail but the edit roles, which AppKit sends to the first
+ * responder; About shows the standard panel.
  */
 class AppkitMenuBar
 {
+    /** AppKit's own action for each edit role, sent to the first responder, and its key equivalent (upper case adds Shift). */
+    public const array EDIT = [
+        'undo' => ['undo:', 'z'],
+        'redo' => ['redo:', 'Z'],
+        'cut' => ['cut:', 'x'],
+        'copy' => ['copy:', 'c'],
+        'paste' => ['paste:', 'v'],
+        'select-all' => ['selectAll:', 'a'],
+    ];
+
     protected NSMenu $main;
 
     /**
@@ -106,7 +117,8 @@ class AppkitMenuBar
     {
         $slot = NSMenuItem::initWithTitleActionKeyEquivalent($folder->label, null, '');
         $menu = NSMenu::initWithTitle($folder->label);
-        $menu->setAutoenablesItems(false);
+        // A folder with edit items validates them against the first responder; others stay as built.
+        $menu->setAutoenablesItems(array_any($folder->items, fn (MenuItem $item): bool => $item->role?->isEdit() === true));
 
         foreach ($folder->items as $item) {
             $menu->addItem(match (true) {
@@ -123,6 +135,15 @@ class AppkitMenuBar
 
     protected function leaf(MenuItem $item): NSMenuItem
     {
+        if ($item->role?->isEdit() === true) {
+            [$action, $key] = self::EDIT[$item->role->value];
+            // No target: AppKit sends the action up the responder chain from the first responder.
+            $native = NSMenuItem::initWithTitleActionKeyEquivalent($item->label, $action, $key);
+            $this->items[$item->id] = $native;
+
+            return $native;
+        }
+
         $native = NSMenuItem::initWithTitleActionKeyEquivalent($item->label, ObjCTarget::ACTION, strtolower($item->hotkey ?? ''));
         $window = $this->window ?? '';
 

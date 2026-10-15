@@ -499,9 +499,9 @@ trait AppkitPrimitive
     }
 
     /**
-     * The system font at the spec's size and weight, or the named family at that weight
-     * through NSFontManager; a family that is not installed falls back to the system font,
-     * as GTK's and Qt's font matching do.
+     * The system font (the monospaced system font when asked for) at the spec's size and
+     * weight, or the named family at that weight through NSFontManager; a family that is not
+     * installed falls back to the system font, as GTK's and Qt's font matching do.
      *
      * @param FontSpec $font
      * @return NSFont
@@ -517,14 +517,18 @@ trait AppkitPrimitive
             }
         }
 
-        return NSFont::systemFontOfSizeWeight($font->size, match ($font->weight) {
+        $weight = match ($font->weight) {
             FontWeight::LIGHT => NSFont::WEIGHT_LIGHT,
             FontWeight::REGULAR => NSFont::WEIGHT_REGULAR,
             FontWeight::MEDIUM => NSFont::WEIGHT_MEDIUM,
             FontWeight::SEMIBOLD => NSFont::WEIGHT_SEMIBOLD,
             FontWeight::BOLD => NSFont::WEIGHT_BOLD,
             FontWeight::BLACK => NSFont::WEIGHT_BLACK,
-        });
+        };
+
+        return $font->monospace
+            ? NSFont::monospacedSystemFontOfSizeWeight($font->size, $weight)
+            : NSFont::systemFontOfSizeWeight($font->size, $weight);
     }
 
     /**
