@@ -6,6 +6,7 @@ use CFFileDescriptor;
 use CFRunLoop;
 use CFRunLoopSource;
 use Jovian\Toolkits\Appkit\Primitives\AppkitCanvas;
+use Jovian\Toolkits\Appkit\Windows\AppkitStagedWindow;
 use NSApplication;
 use NSApplicationActivationPolicy;
 use NSDate;
@@ -31,6 +32,9 @@ class AppkitSession extends BridgedToolkitSession
      * @var ObjCDelegate|null
      */
     protected ?ObjCDelegate $delegate = null;
+
+    /** The event a tap asked not to dispatch, until the pump reaches it. */
+    private ?NSEvent $withheld = null;
 
     /**
      * The loop's waiter descriptor as a run-loop source, while joined.
@@ -86,6 +90,22 @@ class AppkitSession extends BridgedToolkitSession
      * @param int $budget_ns Zero dispatches what is queued without waiting.
      * @return int Events dispatched.
      */
+    /**
+     * Keep the event a tap is being shown from being dispatched: a tap that has answered it (a
+     * context menu opened for a right press) stops the view under it answering as well. Null
+     * dispatches it after all.
+     */
+    public function withhold(?NSEvent $event): void
+    {
+        $this->withheld = $event;
+    }
+
+    /** The event a tap withheld, until the pump reaches it. */
+    public function withheld(): ?NSEvent
+    {
+        return $this->withheld;
+    }
+
     public function pump(int $budget_ns): int
     {
         // The wake callout is one-shot: re-armed for each wait, so a descriptor the loop has not
@@ -96,12 +116,18 @@ class AppkitSession extends BridgedToolkitSession
         $dispatched = 0;
 
         while ($event = $this->application->nextEventMatchingMaskUntilDateInModeDequeue(NSEventMask::ANY, $until, NSDefaultRunLoopMode, true)) {
-            $this->application->sendEvent($event);
+            $this->see($event);
+            if ($this->withheld === $event) {
+                $this->withheld = null;
+            } else {
+                $this->application->sendEvent($event);
+            }
             $dispatched++;
             $until = NSDate::distantPast();
         }
         $this->application->updateWindows();
         AppkitCanvas::sweepSdlWindows();
+        AppkitStagedWindow::sweepSdlWindows();
 
         return $dispatched;
     }

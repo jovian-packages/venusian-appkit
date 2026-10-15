@@ -3,21 +3,32 @@
 namespace Jovian\Toolkits\Appkit\Bridge;
 
 use Jovian\Toolkits\Appkit\Contracts\Bridge\AppkitBridgeDriver as BridgeContract;
+use Jovian\Toolkits\Appkit\Windows\AppkitDisplays;
 use Jovian\Toolkits\Appkit\Windows\AppkitMenuBar;
+use Jovian\Toolkits\Appkit\Windows\AppkitStagedWindow;
 use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
 use Surface\Bridge\ToolkitBridgeDriver;
+use Surface\Contracts\Windows\Display;
 use Surface\Contracts\Windows\Menus\MenuProfile as MenuProfileContract;
+use Surface\Contracts\Windows\StagedWindowDriver;
 use Surface\Contracts\Windows\ToolkitWindowDriver;
 use Surface\Contracts\Windows\WindowException;
 use Surface\Windows\Menus\MenuProfile;
+use Surface\Windows\StagedWindow;
 
-class AppkitBridgeDriver extends ToolkitBridgeDriver implements BridgeContract, ToolkitWindowDriver
+class AppkitBridgeDriver extends ToolkitBridgeDriver implements BridgeContract, ToolkitWindowDriver, StagedWindowDriver
 {
     /**
      * Open windows by name; a window leaves when it closes.
      * @var array<string, AppkitWindow>
      */
     protected array $windows = [];
+
+    /**
+     * Open staged windows by name; a window leaves when it closes.
+     * @var array<string, AppkitStagedWindow>
+     */
+    protected array $staged = [];
 
     /**
      * The bar macOS shows while none of our windows is key.
@@ -72,6 +83,65 @@ class AppkitBridgeDriver extends ToolkitBridgeDriver implements BridgeContract, 
         }
     }
 
+    public function openStaged(string $name, int $width, int $height, array $options = []): AppkitStagedWindow
+    {
+        if (isset($this->staged[$name])) {
+            throw new WindowException("A staged window named '{$name}' is already open.");
+        }
+
+        return $this->staged[$name] = new AppkitStagedWindow($name, $this->connect(), $this, $width, $height, StagedWindow::options($options, $name));
+    }
+
+    public function hasStaged(string $name): bool
+    {
+        return isset($this->staged[$name]);
+    }
+
+    public function getStaged(string $name): ?AppkitStagedWindow
+    {
+        return $this->staged[$name] ?? null;
+    }
+
+    /**
+     * @return array<string, AppkitStagedWindow>
+     */
+    public function allStaged(): array
+    {
+        return $this->staged;
+    }
+
+    public function closeAllStaged(): void
+    {
+        foreach ($this->staged as $window) {
+            $window->close();
+        }
+    }
+
+    public function displays(): array
+    {
+        $this->connect();
+
+        return AppkitDisplays::all();
+    }
+
+    public function primaryDisplay(): Display
+    {
+        $this->connect();
+
+        return AppkitDisplays::primary();
+    }
+
+    /**
+     * Forget a staged window that closed.
+     * @param string $name
+     * @return void
+     */
+    public function forgetStaged(string $name): void
+    {
+        unset($this->staged[$name]);
+        $this->showDefaultMenuBar();
+    }
+
     public function setDefaultMenuBar(?MenuProfileContract $menu): void
     {
         $menu = $this->concrete($menu);
@@ -97,6 +167,7 @@ class AppkitBridgeDriver extends ToolkitBridgeDriver implements BridgeContract, 
             }
         }
 
+        // A key staged window shows the default bar too: it has none of its own.
         $this->installDefaultMenuBar();
     }
 

@@ -52,6 +52,10 @@ class AppkitWindow implements ToolkitWindow
      */
     protected array $content_constraints = [];
 
+    protected AppkitRightClicks $right_clicks;
+
+    protected AppkitCanvasClicks $canvas_clicks;
+
     public function __construct(
         protected readonly string $name,
         protected readonly AppkitSession $session,
@@ -78,6 +82,8 @@ class AppkitWindow implements ToolkitWindow
         $this->delegate->on('windowWillClose:', fn () => $this->closed());
         $this->delegate->on('windowDidResize:', fn () => $this->resized());
         $this->window->setDelegate($this->delegate);
+        $this->right_clicks = new AppkitRightClicks($this, $session);
+        $this->canvas_clicks = new AppkitCanvasClicks($this, $session);
 
         if (! is_null($menu)) {
             $this->menu = new AppkitMenuBar($session, $menu, $name, $driver->about());
@@ -213,6 +219,18 @@ class AppkitWindow implements ToolkitWindow
         $content->syncNativeEnabled();
     }
 
+    /** The window's right clicks, posted as mail. */
+    public function rightClicks(): AppkitRightClicks
+    {
+        return $this->right_clicks;
+    }
+
+    /** The window's canvas clicks, posted as mail. */
+    public function canvasClicks(): AppkitCanvasClicks
+    {
+        return $this->canvas_clicks;
+    }
+
     /**
      * The native window, for engines that draw into it.
      * @return NSWindow
@@ -273,6 +291,8 @@ class AppkitWindow implements ToolkitWindow
             return;
         }
 
+        $this->right_clicks->detach();
+        $this->canvas_clicks->detach();
         $this->removeContent();
         $this->content_constraints = [];
         $this->session->forgetLatest("window.resized.{$this->name}");
