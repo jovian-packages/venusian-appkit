@@ -3,6 +3,7 @@
 namespace Jovian\Toolkits\Appkit\Primitives;
 
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
+use NSGridCell;
 use NSGridCellPlacement;
 use NSGridView;
 use NSLayoutConstraint;
@@ -53,7 +54,7 @@ class AppkitGrid extends TKGrid
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement, int $spacing, int $padding)
     {
         parent::__construct($name, $window, $parent, $placement, $spacing, $padding);
-        $this->frame = NSView::initWithFrame(new NSRect());
+        $this->frame = NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0));
         $this->frame->setTranslatesAutoresizingMaskIntoConstraints(false);
         $this->frame->addSubview($this->adoptNative($this->buildGrid()));
         $this->pin();
@@ -116,7 +117,7 @@ class AppkitGrid extends TKGrid
     public function removeNative(Child $child): void
     {
         $placement = $child->placement();
-        $this->native->cellAtColumnIndexRowIndex($placement->column, $placement->row)->setContentView(null);
+        $this->native->cellAtColumnIndexRowIndex($placement->column, $placement->row)->setContentView(NSGridCell::emptyContentView());
 
         if ($this->dismantling) {
             return;
@@ -162,10 +163,10 @@ class AppkitGrid extends TKGrid
     {
         $grid = $this->native;
         while ($grid->numberOfColumns() < $columns) {
-            $grid->addColumnWithViews(array_fill(0, $grid->numberOfRows(), null));
+            $grid->addColumnWithViews(array_fill(0, $grid->numberOfRows(), NSGridCell::emptyContentView()));
         }
         while ($grid->numberOfRows() < $rows) {
-            $grid->addRowWithViews(array_fill(0, $grid->numberOfColumns(), null));
+            $grid->addRowWithViews(array_fill(0, $grid->numberOfColumns(), NSGridCell::emptyContentView()));
         }
         $this->pad();
     }
@@ -263,7 +264,7 @@ class AppkitGrid extends TKGrid
         $live = array_filter($this->children, fn (Child $child): bool => ! $child->isRemoved());
         foreach ($live as $child) {
             $placement = $child->placement();
-            $previous->cellAtColumnIndexRowIndex($placement->column, $placement->row)->setContentView(null);
+            $previous->cellAtColumnIndexRowIndex($placement->column, $placement->row)->setContentView(NSGridCell::emptyContentView());
         }
         NSLayoutConstraint::deactivateConstraints($this->pins);
         $this->pins = [];

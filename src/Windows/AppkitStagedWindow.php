@@ -122,7 +122,7 @@ class AppkitStagedWindow extends StagedWindow
         );
         // The PHP object holds the window; AppKit must not release it a second time on close.
         $this->window->setReleasedWhenClosed(false);
-        $this->window->setCanBecomeKey($options['focusable']);
+        self::admitFocus($this->window, $options['focusable']);
         $this->window->setCollectionBehavior(NSWindowCollectionBehavior::FULL_SCREEN_PRIMARY);
         $this->window->setLevel($options['always_on_top'] ? NSFloatingWindowLevel : NSNormalWindowLevel);
         if ($options['transparent']) {
@@ -235,7 +235,7 @@ class AppkitStagedWindow extends StagedWindow
     {
         $this->view->setWantsLayer(true);
         $this->view->setLayerContentsRedrawPolicy(NSViewLayerContentsRedrawPolicy::ON_SET_NEEDS_DISPLAY);
-        $this->view->setLayerBackgroundColor($this->transparent ? null : NSColor::colorWithRedGreenBlueAlpha(0.0, 0.0, 0.0, 1.0));
+        $this->view->layer()?->setBackgroundColor($this->transparent ? null : NSColor::colorWithRedGreenBlueAlpha(0.0, 0.0, 0.0, 1.0)->CGColor());
     }
 
     protected function nativeSize(): array
@@ -400,7 +400,17 @@ class AppkitStagedWindow extends StagedWindow
 
     protected function applyFocusable(bool $focusable): void
     {
-        $this->native()->setCanBecomeKey($focusable);
+        self::admitFocus($this->window ?? throw new WindowException("Staged window '{$this->name}' was closed."), $focusable);
+    }
+
+    /**
+     * Whether $window may become key and main: both answers are $focusable, a borderless
+     * window included (a plain borderless NSWindow never can).
+     */
+    protected static function admitFocus(ObjCStageWindow $window, bool $focusable): void
+    {
+        $window->on('canBecomeKeyWindow', static fn (): bool => $focusable);
+        $window->on('canBecomeMainWindow', static fn (): bool => $focusable);
     }
 
     protected function applyOpacity(float $opacity): void
@@ -411,9 +421,11 @@ class AppkitStagedWindow extends StagedWindow
     protected function applyKeepAwake(bool $awake): void
     {
         if ($awake && is_null($this->assertion)) {
-            $this->assertion = IOPMAssertion::createWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep, kIOPMAssertionLevelOn, "Staged window '{$this->name}'");
+            $assertion = null;
+            $this->ioChecked(IOPMAssertion::createWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep, kIOPMAssertionLevelOn, "Staged window '{$this->name}'", $assertion), 'IOPMAssertionCreateWithName');
+            $this->assertion = $assertion;
         } elseif (! $awake && ! is_null($this->assertion)) {
-            IOPMAssertion::release($this->assertion);
+            $this->ioChecked(IOPMAssertion::release($this->assertion), 'IOPMAssertionRelease');
             $this->assertion = null;
         }
     }
@@ -421,24 +433,24 @@ class AppkitStagedWindow extends StagedWindow
     /** Bounces the Dock icon until the app is active. */
     protected function applyAttention(): void
     {
-        $this->session->application()->requestUserAttention(NSRequestUserAttentionType::CRITICAL);
+        $this->session->application()->requestUserAttention(NSRequestUserAttentionType::CRITICAL_REQUEST);
     }
 
     /** The Dock icon: macOS has one icon for the app, so the last window to set one wins. */
     protected function applyIcon(string $rgba8, int $width, int $height): void
     {
-        $image = $this->image(CFData::create($rgba8), $width, $height, $width * 4, true);
+        $image = $this->image(CFData::create(null, $rgba8, strlen($rgba8)), $width, $height, $width * 4, true);
         $this->session->application()->setApplicationIconImage(NSImage::initWithCGImageSize($image, new NSSize((float) $width, (float) $height)));
     }
 
     protected function applyPixels(string $rgba8, int $width, int $height, array $damage): void
     {
-        $this->showFrame(CFData::create($rgba8), $width, $height, $width * 4, $damage);
+        $this->showFrame(CFData::create(null, $rgba8, strlen($rgba8)), $width, $height, $width * 4, $damage);
     }
 
     protected function applyAddress(int $address, int $width, int $height, int $stride, array $damage): void
     {
-        $this->showFrame(CFData::create($address, $stride * $height), $width, $height, $stride, $damage);
+        $this->showFrame(CFData::create(null, $address, $stride * $height), $width, $height, $stride, $damage);
     }
 
     protected function destroyNative(): void
@@ -460,7 +472,7 @@ class AppkitStagedWindow extends StagedWindow
      *
      * @param  list<Region>  $damage
      */
-    protected function showFrame(CFData $bytes, int $width, int $height, int $stride, array $damage): void
+    protected function showFrame(?CFData $bytes, int $width, int $height, int $stride, array $damage): void
     {
         $resized = $this->image_size !== [$width, $height];
         $this->image = $this->image($bytes, $width, $height, $stride, $this->transparent);
@@ -478,14 +490,14 @@ class AppkitStagedWindow extends StagedWindow
         }
     }
 
-    /** @throws WindowException When Core Graphics refuses the image. */
-    protected function image(CFData $bytes, int $width, int $height, int $stride, bool $alpha): CGImage
+    /** @throws WindowException When Core Foundation makes no data or Core Graphics refuses the image. */
+    protected function image(?CFData $bytes, int $width, int $height, int $stride, bool $alpha): CGImage
     {
         self::$space ??= CGColorSpace::createWithName(kCGColorSpaceSRGB);
-        $provider = CGDataProvider::createWithCFData($bytes);
+        $provider = is_null($bytes) ? null : CGDataProvider::createWithCFData($bytes);
         $image = is_null($provider) ? null : CGImage::create(
             $width, $height, 8, 32, $stride, self::$space,
-            ($alpha ? kCGImageAlphaLast : kCGImageAlphaNoneSkipLast) | kCGBitmapByteOrder32Big, $provider, false, kCGRenderingIntentDefault,
+            ($alpha ? kCGImageAlphaLast : kCGImageAlphaNoneSkipLast) | kCGBitmapByteOrder32Big, $provider, null, false, kCGRenderingIntentDefault,
         );
 
         return $image ?? throw new WindowException("Staged window '{$this->name}' could not show a {$width}x{$height} image.");
@@ -564,7 +576,7 @@ class AppkitStagedWindow extends StagedWindow
         $this->native()->toggleFullScreen(null);
     }
 
-    /** @throws WindowException When the display offers no mode like $mode. */
+    /** @throws WindowException When the display offers no mode like $mode, or Core Graphics refuses the capture or the mode. */
     protected function enterExclusive(DisplayMode $mode): void
     {
         $native = AppkitDisplays::nativeMode($mode)
@@ -576,12 +588,12 @@ class AppkitStagedWindow extends StagedWindow
         if (is_null($this->captured)) {
             $this->before_exclusive = [$window->frame(), $window->styleMask()];
             AppkitDisplays::holdDesktop($mode->displayId);
-            CGDisplay::capture($mode->displayId);
+            $this->cgChecked(CGDisplay::capture($mode->displayId), 'CGDisplayCapture');
             $this->captured = $mode->displayId;
             $window->setStyleMask(NSWindowStyleMask::BORDERLESS);
             $window->setLevel(CGDisplay::shieldingWindowLevel());
         }
-        CGDisplay::setDisplayMode($mode->displayId, $native);
+        $this->cgChecked(CGDisplay::setDisplayMode($mode->displayId, $native, null), 'CGDisplaySetDisplayMode');
         $window->setFrameDisplay(AppkitDisplays::displayRect($mode->displayId), true);
         $window->makeKeyAndOrderFront(null);
     }
@@ -593,7 +605,7 @@ class AppkitStagedWindow extends StagedWindow
             return;
         }
         AppkitDisplays::restoreDesktop($this->captured);
-        CGDisplay::release($this->captured);
+        $this->cgChecked(CGDisplay::release($this->captured), 'CGDisplayRelease');
         $this->captured = null;
         if (! is_null($this->window) && ! is_null($this->before_exclusive)) {
             [$frame, $style] = $this->before_exclusive;
@@ -718,11 +730,27 @@ class AppkitStagedWindow extends StagedWindow
     {
         $this->leaveExclusive();
         if (! is_null($this->assertion)) {
-            IOPMAssertion::release($this->assertion);
+            $this->ioChecked(IOPMAssertion::release($this->assertion), 'IOPMAssertionRelease');
             $this->assertion = null;
         }
         $this->link?->invalidate();
         $this->link = null;
+    }
+
+    /** @throws WindowException When a Core Graphics call answers anything but kCGErrorSuccess. */
+    protected function cgChecked(int $error, string $call): void
+    {
+        if ($error !== kCGErrorSuccess) {
+            throw new WindowException("Staged window '{$this->name}': {$call} failed with CGError {$error}.");
+        }
+    }
+
+    /** @throws WindowException When an I/O Kit call answers anything but kIOReturnSuccess. */
+    protected function ioChecked(int $result, string $call): void
+    {
+        if ($result !== kIOReturnSuccess) {
+            throw new WindowException(sprintf("Staged window '%s': %s failed with IOReturn 0x%x.", $this->name, $call, $result & 0xFFFFFFFF));
+        }
     }
 
     protected function live(): static

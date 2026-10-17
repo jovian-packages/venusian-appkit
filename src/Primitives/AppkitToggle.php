@@ -29,7 +29,7 @@ class AppkitToggle extends TKToggle
     {
         parent::__construct($name, $window, $parent, $placement, $on);
         $this->target = new ObjCTarget(fn () => $this->toggled());
-        $switch = $this->adoptNative(NSSwitch::initWithFrame(new NSRect()));
+        $switch = $this->adoptNative(NSSwitch::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
         $switch->setState($on ? NSControlStateValue::ON : NSControlStateValue::OFF);
         $switch->setTarget($this->target);
         $switch->setAction(ObjCTarget::ACTION);

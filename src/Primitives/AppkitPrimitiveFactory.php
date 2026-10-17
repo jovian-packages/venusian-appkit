@@ -24,7 +24,9 @@ use Surface\Contracts\Windows\Primitives\TKScrollView;
 use Surface\Contracts\Windows\Primitives\TKSeparator;
 use Surface\Contracts\Windows\Primitives\TKSlider;
 use Surface\Contracts\Windows\Primitives\TKSpinner;
+use Surface\Contracts\Windows\Primitives\TKSplitView;
 use Surface\Contracts\Windows\Primitives\TKTable;
+use Surface\Contracts\Windows\Primitives\TKTabView;
 use Surface\Contracts\Windows\Primitives\TKTextArea;
 use Surface\Contracts\Windows\Primitives\TKTextInput;
 use Surface\Contracts\Windows\Primitives\TKToggle;
@@ -155,6 +157,16 @@ class AppkitPrimitiveFactory implements PrimitiveFactory
     public function mintScrollView(TKPrimitiveGroup $host, string $name): TKScrollView
     {
         return new AppkitScrollView($name, $this->window, $host, $this->placement($host));
+    }
+
+    public function mintSplit(TKPrimitiveGroup $host, string $name, bool $horizontal): TKSplitView
+    {
+        return new AppkitSplitView($name, $this->window, $host, $this->placement($host), $horizontal);
+    }
+
+    public function mintTabs(TKPrimitiveGroup $host, string $name): TKTabView
+    {
+        return new AppkitTabView($name, $this->window, $host, $this->placement($host));
     }
 
     /**

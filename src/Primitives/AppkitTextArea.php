@@ -236,7 +236,7 @@ class AppkitTextArea extends TKTextArea
         foreach ($backgrounds as $line => $color) {
             $block = NSTextBlock::init();
             $block->setBackgroundColor(self::nsColor($color));
-            $block->setValueTypeForDimension(100.0, NSTextBlockValueType::PERCENTAGE, NSTextBlockDimension::WIDTH);
+            $block->setValueTypeForDimension(100.0, NSTextBlockValueType::PERCENTAGE_VALUE_TYPE, NSTextBlockDimension::WIDTH);
             $style = NSMutableParagraphStyle::init();
             $style->setTextBlocks([$block]);
             $start = $lines->utf16Start($line);
@@ -318,7 +318,7 @@ class AppkitTextArea extends TKTextArea
             $top = $content->height;
         } else {
             $manager = $this->text->layoutManager();
-            $glyphs = $manager->glyphRangeForCharacterRange(new NSRange($start, 1));
+            [$glyphs] = $manager->glyphRangeForCharacterRangeActualCharacterRange(new NSRange($start, 1));
             $top = $manager->boundingRectForGlyphRangeInTextContainer($glyphs, $this->text->textContainer())->y
                 + $this->text->textContainerInset()->height;
         }

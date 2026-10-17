@@ -102,7 +102,7 @@ it('paints its background on the table view', function (): void {
     $table = $window->column('m')->table('t', [new TableColumn('n', 'N')], [['n' => 'a']]);
     $built = $table->native()->documentView()->backgroundColor();
     $table->setBackground(Surface\NutsAndBolts\Color::hex('#ff0000'));
-    expect(round($table->native()->documentView()->backgroundColor()->redComponent(), 2))->toBe(1.0);
+    expect(round($table->native()->documentView()->backgroundColor()->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->redComponent(), 2))->toBe(1.0);
     $table->setBackground(null);
     expect($table->native()->documentView()->backgroundColor())->toEqual($built);
 });

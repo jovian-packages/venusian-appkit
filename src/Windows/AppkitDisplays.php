@@ -112,13 +112,20 @@ final class AppkitDisplays
         self::$desktop[$id] ??= CGDisplay::copyDisplayMode($id) ?? throw new WindowException("Display {$id} reports no mode.");
     }
 
-    /** Put $id back on its desktop mode and forget it; nothing when none is held. */
+    /**
+     * Put $id back on its desktop mode and forget it; nothing when none is held.
+     *
+     * @throws WindowException When Core Graphics refuses the mode; the desktop mode stays held.
+     */
     public static function restoreDesktop(int $id): void
     {
         if (! isset(self::$desktop[$id])) {
             return;
         }
-        CGDisplay::setDisplayMode($id, self::$desktop[$id]);
+        $error = CGDisplay::setDisplayMode($id, self::$desktop[$id], null);
+        if ($error !== kCGErrorSuccess) {
+            throw new WindowException("Display {$id}: CGDisplaySetDisplayMode failed with CGError {$error}.");
+        }
         unset(self::$desktop[$id]);
     }
 

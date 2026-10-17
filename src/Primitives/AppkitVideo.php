@@ -44,6 +44,11 @@ class AppkitVideo extends TKVideo
     protected ?AVPlayerItem $item = null;
 
     /**
+     * The KVO context every registration of the observer is made and removed with.
+     */
+    protected const int KVO_CONTEXT = 0;
+
+    /**
      * Hears the player's timeControlStatus and the item's status.
      */
     protected ObjCObserver $observer;
@@ -58,10 +63,10 @@ class AppkitVideo extends TKVideo
         parent::__construct($name, $window, $parent, $placement, $file);
         $this->player = AVPlayer::playerWithPlayerItem(null);
         $this->player->setActionAtItemEnd(AVPlayerActionAtItemEnd::PAUSE);
-        $this->observer = new ObjCObserver(fn (string $path) => $path === 'status' ? $this->statusChanged() : $this->controlChanged());
-        $this->observer->observe($this->player, 'timeControlStatus', ObjCObserver::OPTION_NEW);
+        $this->observer = new ObjCObserver(fn (string $path, ?NSObject $object, array $change, int $context) => $path === 'status' ? $this->statusChanged() : $this->controlChanged());
+        $this->observer->observe($this->player, 'timeControlStatus', ObjCObserver::OPTION_NEW, self::KVO_CONTEXT);
 
-        $view = $this->adoptNative(AVPlayerView::initWithFrame(new NSRect()));
+        $view = $this->adoptNative(AVPlayerView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
         $view->setControlsStyle(AVPlayerViewControlsStyle::INLINE);
         $view->setPlayer($this->player);
         $this->applyFile($file);
@@ -80,7 +85,7 @@ class AppkitVideo extends TKVideo
         $this->forgetItem();
         if (! is_null($file)) {
             $this->item = AVPlayerItem::playerItemWithURL(NSURL::fileURLWithPath($file));
-            $this->observer->observe($this->item, 'status', ObjCObserver::OPTION_NEW);
+            $this->observer->observe($this->item, 'status', ObjCObserver::OPTION_NEW, self::KVO_CONTEXT);
             $this->end_observer = NSNotificationCenter::defaultCenter()->addObserverForNameObjectQueueUsingBlock(
                 AVPlayerItemDidPlayToEndTimeNotification,
                 $this->item,
@@ -94,7 +99,7 @@ class AppkitVideo extends TKVideo
     protected function applyPlay(): void
     {
         if ($this->atEnd()) {
-            $this->player->seekToTime(new CMTime(0, 600));
+            $this->player->seekToTime(CMTime::make(0, 600));
         }
         $this->player->play();
     }
@@ -106,7 +111,7 @@ class AppkitVideo extends TKVideo
 
     protected function applySeek(float $seconds): void
     {
-        $this->player->seekToTime(CMTime::withSeconds($seconds, 600));
+        $this->player->seekToTime(CMTime::makeWithSeconds($seconds, 600));
     }
 
     protected function applyMuted(bool $muted): void
@@ -126,7 +131,7 @@ class AppkitVideo extends TKVideo
 
     protected function nativePosition(): float
     {
-        $seconds = $this->player->currentTime()->seconds();
+        $seconds = $this->player->currentTime()->getSeconds();
 
         return is_finite($seconds) ? $seconds : 0.0;
     }
@@ -136,7 +141,7 @@ class AppkitVideo extends TKVideo
         if (is_null($this->item) || $this->item->status() !== AVPlayerItemStatus::READY_TO_PLAY) {
             return null;
         }
-        $seconds = $this->item->duration()->seconds();
+        $seconds = $this->item->duration()->getSeconds();
 
         return is_finite($seconds) ? $seconds : null;
     }
@@ -146,7 +151,7 @@ class AppkitVideo extends TKVideo
         $this->player->pause();
         $this->forgetItem();
         $this->player->replaceCurrentItemWithPlayerItem(null);
-        $this->observer->stop($this->player, 'timeControlStatus');
+        $this->observer->stop($this->player, 'timeControlStatus', self::KVO_CONTEXT);
         $this->native->setPlayer(null);
     }
 
@@ -155,7 +160,7 @@ class AppkitVideo extends TKVideo
         if (is_null($this->item)) {
             return;
         }
-        $this->observer->stop($this->item, 'status');
+        $this->observer->stop($this->item, 'status', self::KVO_CONTEXT);
         NSNotificationCenter::defaultCenter()->removeObserver($this->end_observer);
         $this->end_observer = null;
         $this->item = null;
@@ -195,7 +200,7 @@ class AppkitVideo extends TKVideo
         }
 
         if ($this->looping) {
-            $this->player->seekToTime(new CMTime(0, 600));
+            $this->player->seekToTime(CMTime::make(0, 600));
 
             return;
         }

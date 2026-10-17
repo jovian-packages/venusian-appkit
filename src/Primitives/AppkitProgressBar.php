@@ -21,7 +21,7 @@ class AppkitProgressBar extends TKProgressBar
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement, ?float $fraction)
     {
         parent::__construct($name, $window, $parent, $placement, $fraction);
-        $bar = $this->adoptNative(NSProgressIndicator::initWithFrame(new NSRect()));
+        $bar = $this->adoptNative(NSProgressIndicator::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
         $bar->setStyle(NSProgressIndicatorStyle::BAR);
         $bar->setMinValue(0.0);
         $bar->setMaxValue(1.0);

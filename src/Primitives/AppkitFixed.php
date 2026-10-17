@@ -37,7 +37,7 @@ class AppkitFixed extends TKFixed
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement)
     {
         parent::__construct($name, $window, $parent, $placement);
-        $view = $this->adoptNative(NSView::initWithFrame(new NSRect()));
+        $view = $this->adoptNative(NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
         $view->setPostsFrameChangedNotifications(true);
         $this->frame_observer = NSNotificationCenter::defaultCenter()->addObserverForNameObjectQueueUsingBlock(
             NSViewFrameDidChangeNotification,

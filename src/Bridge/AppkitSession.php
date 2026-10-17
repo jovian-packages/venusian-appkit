@@ -143,12 +143,12 @@ class AppkitSession extends BridgedToolkitSession
     {
         $application = $this->application;
 
-        $this->wake = CFFileDescriptor::create($fd, false, function () use ($application): void {
+        $this->wake = CFFileDescriptor::create(null, $fd, false, function () use ($application): void {
             $application->postEventAtStart(NSEvent::otherEventWithTypeLocationModifierFlagsTimestampWindowNumberContextSubtypeData1Data2(
-                NSEventType::APPLICATION_DEFINED, new NSPoint(), 0, 0.0, 0, null, 0, 0, 0,
+                NSEventType::APPLICATION_DEFINED, new NSPoint(0.0, 0.0), 0, 0.0, 0, null, 0, 0, 0,
             ), false);
         });
-        $this->wake_source = $this->wake->createRunLoopSource(0);
+        $this->wake_source = $this->wake->createRunLoopSource(null, 0);
         CFRunLoop::getMain()->addSource($this->wake_source, kCFRunLoopCommonModes);
     }
 

@@ -17,7 +17,7 @@ beforeEach(function (): void {
 function shownLink(AppkitLink $link): array
 {
     $shown = $link->native()->attributedStringValue();
-    $target = $shown->attributeAtIndex(NSLinkAttributeName, 0);
+    $target = $shown->attributeAtIndexEffectiveRange(NSLinkAttributeName, 0)[0];
 
     return [$shown->string(), $target instanceof NSURL ? $target->absoluteString() : $target];
 }
@@ -37,10 +37,10 @@ it('shows a link as a selectable label whose attributed text carries the URL and
     $link->setText('Docs')->setUrl('mailto:help@example.com')->setFont(new FontSpec(15.0, FontWeight::BOLD, 'Helvetica'))->setAlignment(TextAlignment::RIGHT);
 
     expect(shownLink($link))->toBe(['Docs', 'mailto:help@example.com'])
-        ->and($link->native()->attributedStringValue()->attributeAtIndex(NSFontAttributeName, 0)->pointSize())->toBe(15.0)
+        ->and($link->native()->attributedStringValue()->attributeAtIndexEffectiveRange(NSFontAttributeName, 0)[0]->pointSize())->toBe(15.0)
         ->and($link->native()->font()->pointSize())->toBe(15.0)
         ->and($link->native()->alignment())->toBe(NSTextAlignment::RIGHT)
-        ->and($link->native()->attributedStringValue()->attributeAtIndex(NSParagraphStyleAttributeName, 0)->alignment())->toBe(NSTextAlignment::RIGHT)
+        ->and($link->native()->attributedStringValue()->attributeAtIndexEffectiveRange(NSParagraphStyleAttributeName, 0)[0]->alignment())->toBe(NSTextAlignment::RIGHT)
         ->and(takeMail(session()))->toBe([]);
 });
 
@@ -56,7 +56,7 @@ it('draws a link without a set font in the label font, as a label next to it is 
     $column = driver()->open('main', 300, 200)->column('m');
     $label = $column->label('l', 'Docs');
     $link = $column->link('docs', 'Docs', 'https://example.com/docs');
-    $font = $link->native()->attributedStringValue()->attributeAtIndex(NSFontAttributeName, 0);
+    $font = $link->native()->attributedStringValue()->attributeAtIndexEffectiveRange(NSFontAttributeName, 0)[0];
 
     expect($font)->toBeInstanceOf(NSFont::class)
         ->and([$font->familyName(), $font->pointSize()])->toBe([$label->native()->font()->familyName(), $label->native()->font()->pointSize()]);

@@ -228,14 +228,14 @@ function quartzPoint(NSPoint $point): NSPoint
 function keyEvent(AppkitStagedWindow $window, int $code, bool $down, string $characters = '', int $flags = 0, bool $repeat = false): NSEvent
 {
     return NSEvent::keyEventWithTypeLocationModifierFlagsTimestampWindowNumberContextCharactersCharactersIgnoringModifiersIsARepeatKeyCode(
-        $down ? NSEventType::KEY_DOWN : NSEventType::KEY_UP, new NSPoint(), $flags, 0.0, $window->native()->windowNumber(), null, $characters, $characters, $repeat, $code,
+        $down ? NSEventType::KEY_DOWN : NSEventType::KEY_UP, new NSPoint(0.0, 0.0), $flags, 0.0, $window->native()->windowNumber(), null, $characters, $characters, $repeat, $code,
     );
 }
 
 function flagsEvent(AppkitStagedWindow $window, int $code, int $flags): NSEvent
 {
     return NSEvent::keyEventWithTypeLocationModifierFlagsTimestampWindowNumberContextCharactersCharactersIgnoringModifiersIsARepeatKeyCode(
-        NSEventType::FLAGS_CHANGED, new NSPoint(), $flags, 0.0, $window->native()->windowNumber(), null, '', '', false, $code,
+        NSEventType::FLAGS_CHANGED, new NSPoint(0.0, 0.0), $flags, 0.0, $window->native()->windowNumber(), null, '', '', false, $code,
     );
 }
 
@@ -322,4 +322,27 @@ function deliver(AppkitInputEngine $engine, NSEvent ...$events): void
     }
     $session->pump(0);
     $engine->poll();
+}
+
+/**
+ * The descriptor number behind a stream, for CFFileDescriptor::create(): the /dev/fd entry
+ * with the stream's inode and mode (a socket's fstat() device is -1, so the device is not compared).
+ *
+ * @param resource $stream
+ */
+function streamDescriptor($stream): int
+{
+    $want = fstat($stream);
+    foreach (scandir('/dev/fd') as $entry) {
+        // The listing's own descriptor is closed by now: file_exists() skips it without a warning.
+        if (! ctype_digit($entry) || ! file_exists('/dev/fd/'.$entry)) {
+            continue;
+        }
+        $stat = stat('/dev/fd/'.$entry);
+        if ($stat !== false && $stat['ino'] === $want['ino'] && $stat['mode'] === $want['mode']) {
+            return (int) $entry;
+        }
+    }
+
+    throw new RuntimeException('No /dev/fd entry matches the stream');
 }

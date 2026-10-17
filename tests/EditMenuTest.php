@@ -47,7 +47,7 @@ it('selects all in the focused text input and undoes typing over it', function (
 
     performEdit($window, 'edit.select-all');
     session()->application()->postEventAtStart(NSEvent::keyEventWithTypeLocationModifierFlagsTimestampWindowNumberContextCharactersCharactersIgnoringModifiersIsARepeatKeyCode(
-        NSEventType::KEY_DOWN, new NSPoint(), 0, 0.0, $window->native()->windowNumber(), null, 'x', 'x', false, 0x07,
+        NSEventType::KEY_DOWN, new NSPoint(0.0, 0.0), 0, 0.0, $window->native()->windowNumber(), null, 'x', 'x', false, 0x07,
     ), false);
     pumpFor(0.1);
     $typed = $input->native()->stringValue();

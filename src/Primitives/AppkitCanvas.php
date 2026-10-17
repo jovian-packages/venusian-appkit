@@ -43,9 +43,10 @@ class AppkitCanvas extends TKCanvas
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement)
     {
         parent::__construct($name, $window, $parent, $placement);
-        $view = $this->adoptNative(NSView::initWithFrame(new NSRect()));
-        $view->setLayerMasksToBounds(true);
-        $view->setLayerContentsGravity(kCAGravityResize);
+        $view = $this->adoptNative(NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
+        $view->setWantsLayer(true);
+        $view->layer()?->setMasksToBounds(true);
+        $view->layer()?->setContentsGravity(kCAGravityResize);
     }
 
     /** The window's backing scale: 2.0 on a Retina display. */
@@ -59,12 +60,12 @@ class AppkitCanvas extends TKCanvas
      */
     protected function applyPixels(string $rgba8, int $width, int $height, array $damage): void
     {
-        $this->showData(CFData::create($rgba8), $width, $height);
+        $this->showData(CFData::create(null, $rgba8, strlen($rgba8)), $width, $height);
     }
 
     protected function applyAddress(int $address, int $width, int $height, int $stride, array $damage): void
     {
-        $this->showData(CFData::create($address, $stride * $height), $width, $height);
+        $this->showData(CFData::create(null, $address, $stride * $height), $width, $height);
     }
 
     protected function lendingView(): NSView
@@ -80,8 +81,9 @@ class AppkitCanvas extends TKCanvas
     /** A backing layer of the view's own again, set up as the constructor set the first. */
     protected function restoreOwnLayer(): void
     {
-        $this->native->setLayerMasksToBounds(true);
-        $this->native->setLayerContentsGravity(kCAGravityResize);
+        $this->native->setWantsLayer(true);
+        $this->native->layer()?->setMasksToBounds(true);
+        $this->native->layer()?->setContentsGravity(kCAGravityResize);
     }
 
     /** Parked SDL windows whose device has let go are destroyed first. */
@@ -95,20 +97,21 @@ class AppkitCanvas extends TKCanvas
     /**
      * The image over $data as the layer's contents.
      *
-     * @throws WindowException When Core Graphics refuses the image.
+     * @throws WindowException When Core Foundation makes no data or Core Graphics refuses the image.
      */
-    private function showData(CFData $data, int $width, int $height): void
+    private function showData(?CFData $data, int $width, int $height): void
     {
         self::$space ??= CGColorSpace::createWithName(kCGColorSpaceSRGB);
-        $provider = CGDataProvider::createWithCFData($data);
+        $provider = is_null($data) ? null : CGDataProvider::createWithCFData($data);
         $image = is_null($provider) ? null : CGImage::create(
             $width, $height, 8, 32, $width * 4, self::$space,
-            kCGImageAlphaNoneSkipLast | kCGBitmapByteOrder32Big, $provider, true, kCGRenderingIntentDefault,
+            kCGImageAlphaNoneSkipLast | kCGBitmapByteOrder32Big, $provider, null, true, kCGRenderingIntentDefault,
         );
         if (is_null($image)) {
             throw new WindowException("Canvas '{$this->path()}' could not show a {$width}x{$height} image.");
         }
 
-        $this->native->setLayerContents($image);
+        $this->native->setWantsLayer(true);
+        $this->native->layer()?->setContents($image);
     }
 }

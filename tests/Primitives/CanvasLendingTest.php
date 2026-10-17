@@ -77,7 +77,8 @@ it('shows metal frames in the window with no pixel through PHP', function (): vo
 
     expect($canvas->boundFramebuffer())->toBe($engine->framebuffer())
         ->and($shown)->toBeGreaterThan(30)
-        ->and($canvas->native()->layerContents())->toBeNull();
+        // A CAMetalLayer's contents is the drawable it presented last, never an image of the canvas's.
+        ->and($canvas->native()->layer()->contents())->not->toBeInstanceOf(CGImage::class);
     $engine->release();
     expect($canvas->lent())->toBeNull();
 });
@@ -110,7 +111,7 @@ it('shows its framebuffer again after a reclaim', function (): void {
     $own = $canvas->framebuffer('dirty');
     $own->fill(0xFF6600FF);
     $canvas->present();
-    $first = $canvas->native()->layerContents();
+    $first = $canvas->native()->layer()->contents();
     $surface = $canvas->lend(SurfaceKind::METAL_LAYER, new LayerBorrower);
 
     $canvas->reclaim();
@@ -120,9 +121,9 @@ it('shows its framebuffer again after a reclaim', function (): void {
     expect($surface->released())->toBeTrue()
         ->and($canvas->native()->layer())->not->toBeNull()
         ->and($canvas->native()->layer()?->pointer())->not->toBe($surface->handle('layer'))
-        ->and($canvas->native()->layerContents())->toBeInstanceOf(CGImage::class)->not->toBe($first)
-        ->and($canvas->native()->layerContentsGravity())->toBe(kCAGravityResize)
-        ->and($canvas->native()->layerMasksToBounds())->toBeTrue();
+        ->and($canvas->native()->layer()->contents())->toBeInstanceOf(CGImage::class)->not->toBe($first)
+        ->and($canvas->native()->layer()->contentsGravity())->toBe(kCAGravityResize)
+        ->and($canvas->native()->layer()->masksToBounds())->toBeTrue();
 });
 
 it('reclaims before it is removed', function (): void {

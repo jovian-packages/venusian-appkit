@@ -24,25 +24,25 @@ it('paints line backgrounds as text blocks and ranges as colour attributes, and 
     $area->setLineBackgrounds([1 => Color::hex('#ff0000')])
         ->setRangeStyles([new TextRangeStyle(2, 4, 2, foreground: Color::hex('#0000ff'), background: Color::hex('#ffff00'))]);
     $storage = $area->native()->documentView()->textStorage();
-    $block = $storage->attributeAtIndex(NSParagraphStyleAttributeName, 4)->textBlocks()[0];
+    $block = $storage->attributeAtIndexEffectiveRange(NSParagraphStyleAttributeName, 4)[0]->textBlocks()[0];
 
-    expect(round($block->backgroundColor()->redComponent(), 2))->toBe(1.0)
+    expect(round($block->backgroundColor()->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->redComponent(), 2))->toBe(1.0)
         ->and($block->valueForDimension(NSTextBlockDimension::WIDTH))->toBe(100.0)
-        ->and($storage->attributeAtIndex(NSParagraphStyleAttributeName, 0))->toBeNull()
+        ->and($storage->attributeAtIndexEffectiveRange(NSParagraphStyleAttributeName, 0)[0])->toBeNull()
         ->and($area->native()->documentView()->layoutManager()->allowsNonContiguousLayout())->toBeTrue()
-        ->and(round($storage->attributeAtIndex(NSForegroundColorAttributeName, 12)->blueComponent(), 2))->toBe(1.0)
-        ->and(round($storage->attributeAtIndex(NSBackgroundColorAttributeName, 13)->greenComponent(), 2))->toBe(1.0)   // the 😀's first unit
-        ->and($storage->attributeAtIndex(NSBackgroundColorAttributeName, 11))->toBeNull()
-        ->and($storage->attributeAtIndex(NSBackgroundColorAttributeName, 15))->toBeNull();
+        ->and(round($storage->attributeAtIndexEffectiveRange(NSForegroundColorAttributeName, 12)[0]->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->blueComponent(), 2))->toBe(1.0)
+        ->and(round($storage->attributeAtIndexEffectiveRange(NSBackgroundColorAttributeName, 13)[0]->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->greenComponent(), 2))->toBe(1.0)   // the 😀's first unit
+        ->and($storage->attributeAtIndexEffectiveRange(NSBackgroundColorAttributeName, 11)[0])->toBeNull()
+        ->and($storage->attributeAtIndexEffectiveRange(NSBackgroundColorAttributeName, 15)[0])->toBeNull();
 
     $area->setTextColor(Color::hex('#00ff00'));
-    expect(round($storage->attributeAtIndex(NSForegroundColorAttributeName, 12)->blueComponent(), 2))->toBe(1.0)
-        ->and(round($storage->attributeAtIndex(NSForegroundColorAttributeName, 0)->greenComponent(), 2))->toBe(1.0);
+    expect(round($storage->attributeAtIndexEffectiveRange(NSForegroundColorAttributeName, 12)[0]->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->blueComponent(), 2))->toBe(1.0)
+        ->and(round($storage->attributeAtIndexEffectiveRange(NSForegroundColorAttributeName, 0)[0]->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->greenComponent(), 2))->toBe(1.0);
 
     $area->native()->documentView()->setSelectedRange(new NSRange(4, 0));   // the caret inside the styled line
     $area->setValue("x\ny");
-    expect($storage->attributeAtIndex(NSParagraphStyleAttributeName, 0))->toBeNull()
-        ->and($storage->attributeAtIndex(NSBackgroundColorAttributeName, 2))->toBeNull()
+    expect($storage->attributeAtIndexEffectiveRange(NSParagraphStyleAttributeName, 0)[0])->toBeNull()
+        ->and($storage->attributeAtIndexEffectiveRange(NSBackgroundColorAttributeName, 2)[0])->toBeNull()
         ->and($area->native()->documentView()->string())->toBe("x\ny")
         ->and(viewMail(session()))->toBe([]);
 });
@@ -57,7 +57,7 @@ it('puts range foregrounds back where a user edit moved them when the text colou
     $window->native()->makeFirstResponder($text);
     $text->setSelectedRange(new NSRange(0, 4));   // "one\n"
     session()->application()->postEventAtStart(NSEvent::keyEventWithTypeLocationModifierFlagsTimestampWindowNumberContextCharactersCharactersIgnoringModifiersIsARepeatKeyCode(
-        NSEventType::KEY_DOWN, new NSPoint(), 0, 0.0, $window->native()->windowNumber(), null, "\u{7f}", "\u{7f}", false, 0x33,
+        NSEventType::KEY_DOWN, new NSPoint(0.0, 0.0), 0, 0.0, $window->native()->windowNumber(), null, "\u{7f}", "\u{7f}", false, 0x33,
     ), false);
     pumpFor(0.1);
     $window->native()->makeFirstResponder(null);
@@ -67,10 +67,10 @@ it('puts range foregrounds back where a user edit moved them when the text colou
     $storage = $text->textStorage();
 
     expect($edited)->toBe("two\nthree")
-        ->and(round($storage->attributeAtIndex(NSForegroundColorAttributeName, 4)->blueComponent(), 2))->toBe(1.0)
-        ->and(round($storage->attributeAtIndex(NSForegroundColorAttributeName, 8)->blueComponent(), 2))->toBe(1.0)
-        ->and(round($storage->attributeAtIndex(NSForegroundColorAttributeName, 0)->greenComponent(), 2))->toBe(1.0)
-        ->and(round($storage->attributeAtIndex(NSForegroundColorAttributeName, 3)->greenComponent(), 2))->toBe(1.0);
+        ->and(round($storage->attributeAtIndexEffectiveRange(NSForegroundColorAttributeName, 4)[0]->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->blueComponent(), 2))->toBe(1.0)
+        ->and(round($storage->attributeAtIndexEffectiveRange(NSForegroundColorAttributeName, 8)[0]->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->blueComponent(), 2))->toBe(1.0)
+        ->and(round($storage->attributeAtIndexEffectiveRange(NSForegroundColorAttributeName, 0)[0]->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->greenComponent(), 2))->toBe(1.0)
+        ->and(round($storage->attributeAtIndexEffectiveRange(NSForegroundColorAttributeName, 3)[0]->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->greenComponent(), 2))->toBe(1.0);
 });
 
 it('selects lines over UTF-16 offsets and reads the selection back as lines', function (): void {
@@ -216,7 +216,7 @@ it('keeps a no-wrap area with line backgrounds as wide as its widest line, and s
     $width = $text->frame()->width;
 
     // A 100 % block in the unbounded no-wrap container does not widen the laid-out text.
-    expect($text->textStorage()->attributeAtIndex(NSParagraphStyleAttributeName, 0)->textBlocks())->toHaveCount(1)
+    expect($text->textStorage()->attributeAtIndexEffectiveRange(NSParagraphStyleAttributeName, 0)[0]->textBlocks())->toHaveCount(1)
         ->and($width)->toBeGreaterThan($clip->bounds()->width)
         ->and($width)->toBeLessThan(10 * $clip->bounds()->width)
         ->and($layout->usedRectForTextContainer($text->textContainer())->width)->toBeLessThanOrEqual($width)
@@ -227,8 +227,8 @@ it('keeps a no-wrap area with line backgrounds as wide as its widest line, and s
         ->and($area->scrollPosition()->x + $area->scrollPosition()->width)->toEqualWithDelta(1.0, 0.001);
 
     $area->setWrap(true);
-    $block = $text->textStorage()->attributeAtIndex(NSParagraphStyleAttributeName, 0)->textBlocks()[0];
-    expect($block->valueTypeForDimension(NSTextBlockDimension::WIDTH))->toBe(NSTextBlockValueType::PERCENTAGE)
+    $block = $text->textStorage()->attributeAtIndexEffectiveRange(NSParagraphStyleAttributeName, 0)[0]->textBlocks()[0];
+    expect($block->valueTypeForDimension(NSTextBlockDimension::WIDTH))->toBe(NSTextBlockValueType::PERCENTAGE_VALUE_TYPE)
         ->and($block->valueForDimension(NSTextBlockDimension::WIDTH))->toBe(100.0)
         ->and($text->frame()->width)->toBeLessThanOrEqual($clip->bounds()->width);
 });

@@ -95,6 +95,22 @@ A profile's edit roles become AppKit's own Edit items: `undo:`, `redo:`, `cut:`,
 
 `textArea(name, text)` is an NSTextView in its NSScrollView: read-only and disabled both leave it selectable but not editable, it wraps or scrolls sideways, takes the monospaced system font when a `FontSpec` asks for monospace, paints line backgrounds as NSTextBlock paragraph styles (TextKit 1) and range colours as text attributes, selects whole lines, and reads and sets its scroll position as content fractions. A watched area posts `view.scrolled.<window>.<path>` (`ViewScrolled`, latest only) for scrolls the user makes; scrolls its own calls cause post nothing.
 
+## Split and tab views
+
+`split(name, horizontal)` is an NSSplitView with thin dividers whose arranged subviews are the panes; a hidden pane collapses, and `positions()` / `setPositions()` are the dividers between visible panes as fractions of the split's length. Its first layout shares the length equally unless positions were set before it. A user's divider drag posts `view.split-moved.<window>.<path>` (`SplitMoved`) once it ends, if a divider moved: NSSplitView tracks the drag in a nested loop, so a local event monitor takes the mouse-down on a divider and dispatches it itself, and the drag ends when that dispatch returns. Window resizes and `setPositions()` post nothing.
+
+`tabs(name)` is an NSTabView with one item per `addPage()`, identified by the page's name, the page's column pinned inside the item's view. A user's tab switch posts `view.tab-selected.<window>.<path>` (`TabSelected`); `select()`, adding the first page and removing the selected one post nothing.
+
+```php
+$split = $window->column('main')->split('panes')->fill();
+$split->column('left')->textArea('a', $left)->fill();
+$split->column('right')->textArea('b', $right)->fill();
+$split->setPositions([0.5]);
+
+$tabs = $window->column('main')->tabs('sessions')->fill();
+$tabs->addPage('one', 'left.txt ↔ right.txt')->label('hint', 'Drop files here');
+```
+
 ## Right-click mail
 
 A right click in a window posts mail naming what was clicked: `view.right-clicked.<window>.<path>` for the innermost primitive under the pointer (`x`, `y` in that primitive, from its top-left), or `window.right-clicked.<window>` on bare content. A right click is the right button (a two-finger or Magic Mouse right click is one) or Ctrl-click. A disabled primitive posts nothing; native context menus still open.

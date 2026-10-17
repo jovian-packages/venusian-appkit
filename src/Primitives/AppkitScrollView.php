@@ -30,7 +30,7 @@ class AppkitScrollView extends TKScrollView
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement)
     {
         parent::__construct($name, $window, $parent, $placement);
-        $scroll = $this->adoptNative(NSScrollView::initWithFrame(new NSRect()));
+        $scroll = $this->adoptNative(NSScrollView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
         $scroll->setHasHorizontalScroller($this->scroll_horizontal);
         $scroll->setHasVerticalScroller($this->scroll_vertical);
         $scroll->setDrawsBackground(false);

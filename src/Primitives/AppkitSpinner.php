@@ -21,7 +21,7 @@ class AppkitSpinner extends TKSpinner
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement)
     {
         parent::__construct($name, $window, $parent, $placement);
-        $indicator = $this->adoptNative(NSProgressIndicator::initWithFrame(new NSRect()));
+        $indicator = $this->adoptNative(NSProgressIndicator::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
         $indicator->setStyle(NSProgressIndicatorStyle::SPINNING);
         $indicator->setIndeterminate(true);
         $indicator->setDisplayedWhenStopped(false);

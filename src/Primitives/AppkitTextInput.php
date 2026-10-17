@@ -42,7 +42,7 @@ class AppkitTextInput extends TKTextInput
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement, string $value, ?string $placeholder, bool $secret)
     {
         parent::__construct($name, $window, $parent, $placement, $value, $placeholder, $secret);
-        $field = $this->adoptNative($secret ? NSSecureTextField::initWithFrame(new NSRect()) : NSTextField::textFieldWithString($value));
+        $field = $this->adoptNative($secret ? NSSecureTextField::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)) : NSTextField::textFieldWithString($value));
         $field->setStringValue($value);
         $field->setPlaceholderString($placeholder);
         $this->built_color = $field->textColor();

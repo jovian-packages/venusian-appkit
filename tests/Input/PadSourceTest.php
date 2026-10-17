@@ -265,11 +265,11 @@ it('watches while connected and lists nothing once disconnected', function (): v
 it('runs the main run loop only while no toolkit session is connected', function (bool $session): void {
     [$read, $write] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
     $fired = 0;
-    $descriptor = CFFileDescriptor::create($read, false, function () use (&$fired): void {
+    $descriptor = CFFileDescriptor::create(null, streamDescriptor($read), false, function () use (&$fired): void {
         $fired++;
     });
     $descriptor->enableCallBacks(kCFFileDescriptorReadCallBack);
-    $runLoopSource = $descriptor->createRunLoopSource(0);
+    $runLoopSource = $descriptor->createRunLoopSource(null, 0);
     CFRunLoop::getMain()->addSource($runLoopSource, kCFRunLoopDefaultMode);
     fwrite($write, 'x');
     // CFFileDescriptor signals its run-loop source from its own thread: give it the time to.

@@ -1,5 +1,10 @@
 # Log
 
+## 2026-10-16
+
+* Composes what ext-appkit 0.10.2 (1:1) no longer decides: layer setters are `setWantsLayer(true)` + `layer()->set…()`, the Metal lend sets `wantsLayer` itself and the reclaim toggles it; `ObjCStageWindow` answers `canBecomeKeyWindow` / `canBecomeMainWindow` from `focusable`; the GL view's draw handler makes its context current and flushes it; CG and I/O Kit return codes and null CFData / CGImage / GL view become `WindowException`; grids pass `NSGridCell::emptyContentView()`.
+* AppkitSplitView (NSSplitView, equal first layout, positions as fractions, SplitMoved from a monitor that dispatches a divider mouse-down itself) and AppkitTabView (NSTabView, TabSelected for user switches); ext-appkit ^0.10.2 (compare-app split and tabs, C2).
+
 ## 2026-10-14
 
 * AppkitTextArea: read-only, wrap, monospace, text-block line backgrounds, range colours, line selection over UTF-16, clip-view scroll position and ViewScrolled (compare-app text panes, C1).

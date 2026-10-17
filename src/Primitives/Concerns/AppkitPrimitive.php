@@ -185,7 +185,7 @@ trait AppkitPrimitive
         }
 
         if (is_null($this->slot)) {
-            $this->slot = NSView::initWithFrame(new NSRect());
+            $this->slot = NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0));
             $this->slot->setTranslatesAutoresizingMaskIntoConstraints(false);
             $own->removeFromSuperview();
             $this->slot->addSubview($own);
@@ -313,7 +313,9 @@ trait AppkitPrimitive
 
     protected function applyBackground(?Color $color): void
     {
-        $this->ownView()->setLayerBackgroundColor(is_null($color) ? null : self::nsColor($color));
+        $view = $this->ownView();
+        $view->setWantsLayer(true);
+        $view->layer()?->setBackgroundColor(is_null($color) ? null : self::nsColor($color)->CGColor());
     }
 
     /**

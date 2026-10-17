@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Jovian\Toolkits\Appkit\Windows\AppkitDisplays;
 use Jovian\Toolkits\Appkit\Windows\AppkitStagedWindow;
 use Surface\Contracts\Drawing\SurfaceKind;
 use Surface\Contracts\Drawing\VSync;
@@ -179,14 +180,17 @@ it('toggles its style natively', function (): void {
 
     $window->setBorderless(true);
     expect($window->native()->styleMask())->toBe(NSWindowStyleMask::BORDERLESS->value)
-        ->and($window->size())->toBe([320, 200]);
+        ->and($window->size())->toBe([320, 200])
+        ->and($window->native()->canBecomeKeyWindow())->toBeTrue()   // a plain borderless NSWindow never can
+        ->and($window->native()->canBecomeMainWindow())->toBeTrue();
     $window->setBorderless(false)->setResizable(false);
     expect($window->native()->styleMask() & NSWindowStyleMask::TITLED->value)->toBe(NSWindowStyleMask::TITLED->value)
         ->and($window->native()->styleMask() & NSWindowStyleMask::RESIZABLE->value)->toBe(0);
 
     $window->setAlwaysOnTop(true)->setFocusable(false)->setOpacity(0.5);
     expect($window->native()->level())->toBe(NSFloatingWindowLevel)
-        ->and($window->native()->canBecomeKey())->toBeFalse()
+        ->and($window->native()->canBecomeKeyWindow())->toBeFalse()
+        ->and($window->native()->canBecomeMainWindow())->toBeFalse()
         ->and($window->native()->alphaValue())->toBe(0.5)
         ->and($window->native()->isOpaque())->toBeFalse()
         ->and($window->isTransparent())->toBeTrue();
@@ -290,6 +294,34 @@ it('keeps the display awake, asks for attention, sets the Dock icon and reads it
     $window->keepAwake(false);
     session()->application()->setApplicationIconImage(null);
     expect($window->isKeptAwake())->toBeFalse();
+});
+
+it('fails where I/O Kit or Core Graphics answers an error, naming the call and its code', function (): void {
+    $window = stage();
+    $assertion = new ReflectionProperty(AppkitStagedWindow::class, 'assertion');
+    $captured = new ReflectionProperty(AppkitStagedWindow::class, 'captured');
+    $desktop = new ReflectionProperty(AppkitDisplays::class, 'desktop');
+    $bogus = 0x7FFF_FFF0;   // neither an assertion I/O Kit made nor a display
+
+    $window->keepAwake(true);
+    $held = $assertion->getValue($window);
+    $assertion->setValue($window, $bogus);
+    expect(fn () => $window->keepAwake(false))
+        ->toThrow(WindowException::class, "Staged window 'stage': IOPMAssertionRelease failed with IOReturn 0xe00002c2.");   // kIOReturnBadArgument
+    $assertion->setValue($window, $held);
+    $window->keepAwake(false);
+
+    $captured->setValue($window, $bogus);
+    expect(fn () => $window->close())
+        ->toThrow(WindowException::class, "Staged window 'stage': CGDisplayRelease failed with CGError ".kCGErrorIllegalArgument.'.');
+    $captured->setValue($window, null);
+    $window->close();
+
+    $desktop->setValue(null, [$bogus => CGDisplay::copyDisplayMode(CGDisplay::mainDisplayID())]);
+    expect(fn () => AppkitDisplays::restoreDesktop($bogus))
+        ->toThrow(WindowException::class, "Display {$bogus}: CGDisplaySetDisplayMode failed with CGError ".kCGErrorFailure.'.')
+        ->and(array_keys($desktop->getValue()))->toBe([$bogus]);
+    $desktop->setValue(null, []);
 });
 
 it('closes on the close box, or asks first with confirm_close', function (): void {

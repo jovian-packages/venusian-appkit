@@ -30,7 +30,7 @@ class AppkitDropdown extends TKDropdown
     {
         parent::__construct($name, $window, $parent, $placement, $options, $selected);
         $this->target = new ObjCTarget(fn () => $this->chosen());
-        $popup = $this->adoptNative(NSPopUpButton::initWithFramePullsDown(new NSRect(), false));
+        $popup = $this->adoptNative(NSPopUpButton::initWithFramePullsDown(new NSRect(0.0, 0.0, 0.0, 0.0), false));
         $popup->setTarget($this->target);
         $popup->setAction(ObjCTarget::ACTION);
         $this->applyOptions($this->options);

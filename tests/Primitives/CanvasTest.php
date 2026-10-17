@@ -31,9 +31,9 @@ it('lays a canvas out like any view and measures it in device pixels', function 
     expect($width)->toBe(300)
         ->and($height)->toBeGreaterThan(100)->toBeLessThan(200)
         ->and($canvas->pixelSize())->toBe([(int) round($width * $scale), (int) round($height * $scale)])
-        ->and($canvas->native()->layerContents())->toBeNull()
-        ->and($canvas->native()->layerContentsGravity())->toBe(kCAGravityResize)
-        ->and($canvas->native()->layerMasksToBounds())->toBeTrue();
+        ->and($canvas->native()->layer()->contents())->toBeNull()
+        ->and($canvas->native()->layer()->contentsGravity())->toBe(kCAGravityResize)
+        ->and($canvas->native()->layer()->masksToBounds())->toBeTrue();
 });
 
 it('shows its framebuffer as the view\'s layer contents, only when something was drawn', function (): void {
@@ -47,17 +47,17 @@ it('shows its framebuffer as the view\'s layer contents, only when something was
     $canvas->present();
     pumpFor(0.05);
 
-    $shown = $canvas->native()->layerContents();
+    $shown = $canvas->native()->layer()->contents();
     expect($buffer)->toBeInstanceOf(DamageTrackingFramebuffer::class)
         ->and($shown)->toBeInstanceOf(CGImage::class)
         ->and([$shown->getWidth(), $shown->getHeight()])->toBe($canvas->pixelSize());
 
     $canvas->present();                                             // nothing drawn since: the same image stays up
-    expect($canvas->native()->layerContents())->toBe($shown);
+    expect($canvas->native()->layer()->contents())->toBe($shown);
 
     $buffer->setSegment(10, 10, 20, 20, 0x000000FF);
     $canvas->present();
-    expect($canvas->native()->layerContents())->toBeInstanceOf(CGImage::class)->not->toBe($shown);
+    expect($canvas->native()->layer()->contents())->toBeInstanceOf(CGImage::class)->not->toBe($shown);
 });
 
 it('stretches a framebuffer of another size over the view', function (): void {
@@ -69,7 +69,7 @@ it('stretches a framebuffer of another size over the view', function (): void {
     $canvas->framebuffer('full', 32, 24)->fill(0x3366CCFF);
     $canvas->present();
 
-    $shown = $canvas->native()->layerContents();
+    $shown = $canvas->native()->layer()->contents();
     expect([$shown->getWidth(), $shown->getHeight()])->toBe([32, 24])
         ->and($canvas->size()[0])->toBe(300);
 });
@@ -81,7 +81,7 @@ it('takes a framebuffer before the window is shown when given a size, and goes w
     $canvas->boundFramebuffer()->present();
     $canvas->present();
 
-    expect($canvas->native()->layerContents()->getWidth())->toBe(16);
+    expect($canvas->native()->layer()->contents()->getWidth())->toBe(16);
 
     $canvas->remove();
     expect(fn () => $canvas->present())->toThrow(WindowException::class, 'was removed')
@@ -99,7 +99,7 @@ it('pipes an ext-fb framebuffer to the view by address', function (): void {
     $canvas->present();
     pumpFor(0.05);
 
-    $shown = $canvas->native()->layerContents();
+    $shown = $canvas->native()->layer()->contents();
     expect($buffer->pointer())->not->toBe(0)
         ->and($shown)->toBeInstanceOf(CGImage::class)
         ->and([$shown->getWidth(), $shown->getHeight()])->toBe([$buffer->viewportWidth(), $buffer->viewportHeight()]);

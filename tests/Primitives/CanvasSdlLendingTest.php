@@ -180,7 +180,7 @@ it('shows sdl3 frames in the window with no pixel through PHP', function (): voi
         ->and($shown)->toBeGreaterThan(30)
         ->and($views)->toHaveCount(1)
         ->and([(int) $drawable->width, (int) $drawable->height])->toBe($canvas->pixelSize())
-        ->and($canvas->native()->layerContents())->toBeNull();
+        ->and($canvas->native()->layer()->contents())->toBeNull();
     $engine->release();
     expect($canvas->lent())->toBeNull();
 });
@@ -209,7 +209,7 @@ it('shows its framebuffer again after a reclaim', function (): void {
     $own = $canvas->framebuffer('dirty');
     $own->fill(0xFF6600FF);
     $canvas->present();
-    $first = $canvas->native()->layerContents();
+    $first = $canvas->native()->layer()->contents();
     $engine = new GpuRenderingEngine(sdl3Device(), ...$canvas->pixelSize(), output: $canvas);
     $engine->frame(fn (RenderingEngine $g) => $g->clear(Color::rgb(0, 0, 255)));
     $canvas->present();
@@ -221,7 +221,7 @@ it('shows its framebuffer again after a reclaim', function (): void {
     pumpFor(0.05);
 
     expect($canvas->lent())->toBeNull()
-        ->and($canvas->native()->layerContents())->toBeInstanceOf(CGImage::class)->not->toBe($first)
+        ->and($canvas->native()->layer()->contents())->toBeInstanceOf(CGImage::class)->not->toBe($first)
         ->and($canvas->native()->subviews())->toBe([]);
 });
 

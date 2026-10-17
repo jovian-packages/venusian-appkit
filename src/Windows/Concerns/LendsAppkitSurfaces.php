@@ -137,15 +137,21 @@ trait LendsAppkitSurfaces
     {
         $layer = CAMetalLayer::layer();
         $layer->setContentsScale($this->nativeScale());
-        $this->lendingView()->setLayer(CALayer::fromPointer($layer->pointer()));
+        $view = $this->lendingView();
+        $view->setWantsLayer(true);
+        $view->setLayer(CALayer::fromPointer($layer->pointer()));
         $this->metal_layer = $layer;
 
         return ['layer' => $layer->pointer()];
     }
 
+    /** The lent layer out; turning wantsLayer off and on again makes AppKit give the view a backing layer of its own. */
     private function removeMetalLayer(): void
     {
-        $this->lendingView()->setLayer(null);
+        $view = $this->lendingView();
+        $view->setLayer(null);
+        $view->setWantsLayer(false);
+        $view->setWantsLayer(true);
         $this->restoreOwnLayer();
         $this->metal_layer = null;
     }
@@ -190,16 +196,19 @@ trait LendsAppkitSurfaces
      * host lends before its window is shown.
      *
      * @return array{context: int}
-     * @throws WindowException When no OpenGL 4.1 core pixel format is offered.
+     * @throws WindowException When no OpenGL 4.1 core pixel format is offered, or AppKit makes no view.
      */
     private function makeGLView(): array
     {
         $format = NSOpenGLPixelFormat::initWithAttributes([NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion4_1Core, NSOpenGLPFAAccelerated, NSOpenGLPFADoubleBuffer, NSOpenGLPFAColorSize, 24, NSOpenGLPFAAlphaSize, 8, 0])
             ?? throw new WindowException("{$this->hostName()} found no OpenGL 4.1 core pixel format.");
-        $view = ObjCOpenGLView::initWithFramePixelFormatDraw(new NSRect(), $format, function (ObjCOpenGLView $view): void {
+        // drawRect: draws in the view's context and swaps it: current before the copy, flushed after.
+        $view = ObjCOpenGLView::initWithFramePixelFormatDraw(new NSRect(0.0, 0.0, 0.0, 0.0), $format, function (ObjCOpenGLView $view, NSRect $dirty): void {
+            $view->openGLContext()?->makeCurrentContext();
             $this->renders++;
             $this->renderLent();
-        });
+            $view->openGLContext()?->flushBuffer();
+        }) ?? throw new WindowException("{$this->hostName()}: AppKit made no NSOpenGLView.");
         $view->setWantsBestResolutionOpenGLSurface(true);
         $context = $view->openGLContext()?->CGLContextObj()
             ?? throw new WindowException("{$this->hostName()}: the NSOpenGLView made no context.");

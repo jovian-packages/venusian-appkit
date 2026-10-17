@@ -209,13 +209,13 @@ it('hides, paints and reorders children natively', function (): void {
     $c->moveBefore($a);
 
     expect($b->native()->isHidden())->toBeTrue()
-        ->and(round($b->native()->layerBackgroundColor()->redComponent(), 2))->toBe(1.0)
+        ->and(round(NSColor::colorWithCGColor($b->native()->layer()->backgroundColor())->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->redComponent(), 2))->toBe(1.0)
         ->and($main->native()->arrangedSubviews())->toBe([$c->native(), $a->native(), $b->native()]);
 
     $b->show()->setBackground(null);
     $a->moveTo(2);
     expect($b->native()->isHidden())->toBeFalse()
-        ->and($b->native()->layerBackgroundColor())->toBeNull()
+        ->and($b->native()->layer()->backgroundColor())->toBeNull()
         ->and($main->native()->arrangedSubviews())->toBe([$c->native(), $b->native(), $a->native()]);
 });
 

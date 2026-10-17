@@ -40,7 +40,7 @@ class AppkitDatepicker extends TKDatepicker
         $this->zone = new DateTimeZone(date_default_timezone_get());
         $this->target = new ObjCTarget(fn () => $this->picked());
 
-        $picker = $this->adoptNative(NSDatePicker::initWithFrame(new NSRect()));
+        $picker = $this->adoptNative(NSDatePicker::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
         $picker->setDatePickerStyle(NSDatePickerStyle::TEXT_FIELD_AND_STEPPER);
         $picker->setDatePickerElements(NSDatePicker::ELEMENT_YEAR_MONTH_DAY);
         $picker->setDatePickerMode(NSDatePickerMode::SINGLE);

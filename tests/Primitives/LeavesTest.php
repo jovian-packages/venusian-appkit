@@ -48,7 +48,7 @@ it('styles a button and refuses clicks while disabled', function (): void {
 
     expect($button->native()->font()->pointSize())->toBe(17.0)
         ->and(NSFontManager::sharedFontManager()->weightOfFont($button->native()->font()))->toBeGreaterThanOrEqual(8)
-        ->and(round($button->native()->contentTintColor()->blueComponent(), 2))->toBe(1.0);
+        ->and(round($button->native()->contentTintColor()->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->blueComponent(), 2))->toBe(1.0);
 
     $button->setTextColor(null);
     $main->disable();
@@ -84,7 +84,7 @@ it('writes label text, wrap, alignment, font and colour to the native', function
         ->and($label->native()->alignment())->toBe(NSTextAlignment::CENTER)
         ->and($label->native()->font()->familyName())->toBe('Helvetica')
         ->and($label->native()->font()->pointSize())->toBe(15.0)
-        ->and(round($label->native()->textColor()->redComponent(), 2))->toBe(1.0)
+        ->and(round($label->native()->textColor()->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->redComponent(), 2))->toBe(1.0)
         // The frame sits 2pt outside the label's alignment rect on each side.
         ->and($label->size()[0])->toBeLessThanOrEqual(204)
         ->and($label->size()[1])->toBeGreaterThan(30);
@@ -119,15 +119,15 @@ it('shows an image at its natural size, scaled per mode, and refuses a file it c
     $window->present();
     pumpFor(0.2);
 
-    expect($image->native()->layerContents())->toBeInstanceOf(NSImage::class)
-        ->and($image->native()->layerContents()->size()->width)->toBe(40.0)
-        ->and($image->native()->layerContentsGravity())->toBe(kCAGravityResizeAspect)
-        ->and($image->native()->layerMasksToBounds())->toBeTrue()
+    expect($image->native()->layer()->contents())->toBeInstanceOf(NSImage::class)
+        ->and($image->native()->layer()->contents()->size()->width)->toBe(40.0)
+        ->and($image->native()->layer()->contentsGravity())->toBe(kCAGravityResizeAspect)
+        ->and($image->native()->layer()->masksToBounds())->toBeTrue()
         ->and($image->size())->toBe([40, 20]);
 
     foreach ([[ImageScaling::FILL, kCAGravityResizeAspectFill], [ImageScaling::CENTER, kCAGravityCenter], [ImageScaling::STRETCH, kCAGravityResize], [ImageScaling::FIT, kCAGravityResizeAspect]] as [$scaling, $gravity]) {
         $image->setScaling($scaling);
-        expect($image->native()->layerContentsGravity())->toBe($gravity);
+        expect($image->native()->layer()->contentsGravity())->toBe($gravity);
     }
 
     expect(fn () => $image->setFile('/nope/missing.png'))->toThrow(WindowException::class, 'missing.png')
@@ -137,7 +137,7 @@ it('shows an image at its natural size, scaled per mode, and refuses a file it c
 
     $image->setFile(null);
     pumpFor(0.1);
-    expect($image->native()->layerContents())->toBeNull()
+    expect($image->native()->layer()->contents())->toBeNull()
         ->and($image->size())->toBe([0, 0]);
     unlink($path);
 });
@@ -216,7 +216,7 @@ it('reports typing as TextChanged and Return as TextSubmitted; code changes post
         ->and($input->native()->stringValue())->toBe('code')
         ->and($input->native()->placeholderString())->toBeNull()
         ->and($input->native()->font()->pointSize())->toBe(16.0)
-        ->and(round($input->native()->textColor()->greenComponent(), 2))->toBe(1.0)
+        ->and(round($input->native()->textColor()->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->greenComponent(), 2))->toBe(1.0)
         ->and($input->native()->isEnabled())->toBeFalse();
 });
 
@@ -242,7 +242,7 @@ it('reports text area edits as TextChanged and keeps the text view inside its sc
     expect(takeMail(session()))->toBe([])
         ->and($text->string())->toBe('from code')
         ->and($text->font()->pointSize())->toBe(18.0)
-        ->and(round($text->textColor()->blueComponent(), 2))->toBe(1.0)
+        ->and(round($text->textColor()->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->blueComponent(), 2))->toBe(1.0)
         ->and($text->isEditable())->toBeFalse();
     $area->enable();
     expect($text->isEditable())->toBeTrue();
@@ -365,9 +365,9 @@ it('paints a text input and a text area background on the control itself', funct
 
     $input->setBackground(Color::hex('#00ff00'));
     $area->setBackground(Color::hex('#0000ff'));
-    expect(round($input->native()->backgroundColor()->greenComponent(), 2))->toBe(1.0)
+    expect(round($input->native()->backgroundColor()->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->greenComponent(), 2))->toBe(1.0)
         ->and($input->native()->drawsBackground())->toBeTrue()
-        ->and(round($text->backgroundColor()->blueComponent(), 2))->toBe(1.0)
+        ->and(round($text->backgroundColor()->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->blueComponent(), 2))->toBe(1.0)
         ->and($text->drawsBackground())->toBeTrue();
 
     $input->setBackground(null);

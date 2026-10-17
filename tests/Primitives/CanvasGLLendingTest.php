@@ -131,7 +131,7 @@ it('shows opengl frames in the window with no pixel through PHP', function (): v
     expect($canvas->lent()?->size())->toBe($canvas->pixelSize())
         ->and($engine->framebuffer()->damage())->toBe([])
         ->and($canvas->renders())->toBeGreaterThan(0)
-        ->and($canvas->native()->layerContents())->toBeNull();
+        ->and($canvas->native()->layer()->contents())->toBeNull();
     $engine->release();
 });
 
@@ -190,7 +190,7 @@ it('shows its framebuffer again after a reclaim', function (): void {
     expect($surface->released())->toBeTrue()
         ->and($canvas->glView())->toBeNull()
         ->and($canvas->native()->subviews())->toBe([])
-        ->and($canvas->native()->layerContents())->toBeInstanceOf(CGImage::class)
+        ->and($canvas->native()->layer()->contents())->toBeInstanceOf(CGImage::class)
         ->and(array_slice($canvas->surfaces(), -1))->toBe([SurfaceKind::GL_CONTEXT]);
 });
 

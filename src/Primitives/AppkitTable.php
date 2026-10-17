@@ -49,7 +49,7 @@ class AppkitTable extends TKTable
     {
         parent::__construct($name, $window, $parent, $placement, $columns, $rows);
 
-        $this->table = NSTableView::initWithFrame(new NSRect());
+        $this->table = NSTableView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0));
         foreach ($this->columns as $column) {
             $native = NSTableColumn::initWithIdentifier($column->id);
             $native->setTitle($column->label);
@@ -66,7 +66,7 @@ class AppkitTable extends TKTable
         $this->table->setDelegate($this->delegate);
 
         $this->built_background = $this->table->backgroundColor();
-        $scroll = $this->adoptNative(NSScrollView::initWithFrame(new NSRect()));
+        $scroll = $this->adoptNative(NSScrollView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
         $scroll->setDocumentView($this->table);
         $scroll->setHasVerticalScroller(true);
     }

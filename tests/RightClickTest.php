@@ -131,10 +131,10 @@ function appkitContextMail(): array
 function whileTracking(Closure $inside): Closure
 {
     [$read, $write] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
-    $descriptor = CFFileDescriptor::create($read, false, function () use ($inside): void {
+    $descriptor = CFFileDescriptor::create(null, streamDescriptor($read), false, function () use ($inside): void {
         $inside();
     });
-    $source = $descriptor->createRunLoopSource(0);
+    $source = $descriptor->createRunLoopSource(null, 0);
     CFRunLoop::getMain()->addSource($source, kCFRunLoopCommonModes);
     $descriptor->enableCallBacks(kCFFileDescriptorReadCallBack);
     fwrite($write, 'x');

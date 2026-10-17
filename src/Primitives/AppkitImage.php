@@ -37,9 +37,10 @@ class AppkitImage extends TKImage
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement, ?string $file)
     {
         parent::__construct($name, $window, $parent, $placement, $file);
-        $view = $this->adoptNative(NSView::initWithFrame(new NSRect()));
-        $view->setLayerMasksToBounds(true);
-        $view->setLayerContentsGravity(self::gravity($this->scaling));
+        $view = $this->adoptNative(NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
+        $view->setWantsLayer(true);
+        $view->layer()?->setMasksToBounds(true);
+        $view->layer()?->setContentsGravity(self::gravity($this->scaling));
         $this->load($file);
     }
 
@@ -61,7 +62,8 @@ class AppkitImage extends TKImage
 
     protected function applyScaling(ImageScaling $scaling): void
     {
-        $this->native->setLayerContentsGravity(self::gravity($scaling));
+        $this->native->setWantsLayer(true);
+        $this->native->layer()?->setContentsGravity(self::gravity($scaling));
     }
 
     protected function naturalLength(bool $horizontal): float
@@ -88,7 +90,8 @@ class AppkitImage extends TKImage
 
         $this->image = $image;
         $this->shown = $file;
-        $this->native->setLayerContents($image);
+        $this->native->setWantsLayer(true);
+        $this->native->layer()?->setContents($image);
 
         $this->remeasure();
     }

@@ -83,7 +83,7 @@ it('ignores key events for windows it does not hold', function (): void {
     inputWindow();
     $engine = appkitInput();
     $stray = NSEvent::keyEventWithTypeLocationModifierFlagsTimestampWindowNumberContextCharactersCharactersIgnoringModifiersIsARepeatKeyCode(
-        NSEventType::KEY_DOWN, new NSPoint(), 0, 0.0, 999_999, null, 'q', 'q', false, 0x0C,
+        NSEventType::KEY_DOWN, new NSPoint(0.0, 0.0), 0, 0.0, 999_999, null, 'q', 'q', false, 0x0C,
     );
 
     deliver($engine, $stray);
@@ -340,10 +340,10 @@ it('releases a key and a modifier let go over another window of the app', functi
     $shift = NSEventModifierFlags::SHIFT->value | 0x2;
     deliver($engine, flagsEvent($window, 0x38, $shift), keyEvent($window, 0x28, true, 'K', $shift));
     $up = fn (NSEventType $type, int $code, int $flags): NSEvent => NSEvent::keyEventWithTypeLocationModifierFlagsTimestampWindowNumberContextCharactersCharactersIgnoringModifiersIsARepeatKeyCode(
-        $type, new NSPoint(), $flags, 0.0, 999_999, null, '', '', false, $code,
+        $type, new NSPoint(0.0, 0.0), $flags, 0.0, 999_999, null, '', '', false, $code,
     );
     $press = NSEvent::keyEventWithTypeLocationModifierFlagsTimestampWindowNumberContextCharactersCharactersIgnoringModifiersIsARepeatKeyCode(
-        NSEventType::KEY_DOWN, new NSPoint(), 0, 0.0, 999_999, null, 'q', 'q', false, 0x0C,
+        NSEventType::KEY_DOWN, new NSPoint(0.0, 0.0), 0, 0.0, 999_999, null, 'q', 'q', false, 0x0C,
     );
 
     deliver($engine, $up(NSEventType::KEY_UP, 0x28, $shift), $up(NSEventType::FLAGS_CHANGED, 0x38, 0), $press);
