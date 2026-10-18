@@ -1,6 +1,7 @@
 {
     "name": "jovian/venusian-appkit",
     "description": "AppKit toolkit driver for the Venusian Surface bridge: connects PHP to NSApplication, opens its windows and builds their menu bars through ext-appkit.",
+    "version": "0.10.4",
     "type": "library",
     "keywords": [
         "framework",
