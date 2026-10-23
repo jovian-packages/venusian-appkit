@@ -11,11 +11,13 @@ use Jovian\Toolkits\Appkit\Windows\Concerns\LendsAppkitSurfaces;
 use NSRect;
 use NSView;
 use NSWindow;
+use ObjCFocusView;
 use Surface\Contracts\Windows\Primitives\Placement;
 use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\Contracts\Windows\WindowException;
 use Surface\Windows\Primitives\TKCanvas;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
+use WeakReference;
 
 /**
  * A layer-backed view whose layer contents are the canvas's pixels: each present() wraps the
@@ -43,10 +45,43 @@ class AppkitCanvas extends TKCanvas
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement)
     {
         parent::__construct($name, $window, $parent, $placement);
-        $view = $this->adoptNative(NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
+        $view = $this->adoptNative(ObjCFocusView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
         $view->setWantsLayer(true);
         $view->layer()?->setMasksToBounds(true);
         $view->layer()?->setContentsGravity(kCAGravityResize);
+        // The view holds the handler, and this canvas the view: a weak reference breaks the cycle.
+        $self = WeakReference::create($this);
+        $view->on('acceptsFirstResponder', static fn (): bool => $self->get()?->acceptsFocus() ?? false);
+    }
+
+    /** The enabled state the user sees: this canvas's own, unless a container above it is disabled. */
+    private bool $native_enabled = true;
+
+    /** What the focus view answers AppKit's acceptsFirstResponder: focusable and enabled, as GTK and Qt give a disabled widget no focus. */
+    public function acceptsFocus(): bool
+    {
+        return $this->isFocusable() && $this->native_enabled;
+    }
+
+    /** A disabled canvas lets go of focus; the window's applyEnabled runs this quietly. */
+    protected function applyNativeEnabled(bool $on): void
+    {
+        $this->native_enabled = $on;
+        $window = $this->host()->native();
+        if (! $on && $window->firstResponder() === $this->native) {
+            $window->makeFirstResponder(null);
+        }
+    }
+
+    /** The focus view's own handler reads the flag; a canvas that stops taking focus while it has it lets go, quietly. */
+    protected function applyFocusable(bool $on, bool $takesTab): void
+    {
+        $window = $this->host()->native();
+        if (! $on && $window->firstResponder() === $this->native) {
+            $this->host()->focusTracker()->quietly(static function () use ($window): void {
+                $window->makeFirstResponder(null);
+            });
+        }
     }
 
     /** The window's backing scale: 2.0 on a Retina display. */

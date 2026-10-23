@@ -3,7 +3,10 @@
 namespace Jovian\Toolkits\Appkit\Primitives;
 
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
+use NSApplication;
 use NSColor;
+use NSEvent;
+use NSEventType;
 use NSRect;
 use NSSecureTextField;
 use NSTextField;
@@ -17,14 +20,21 @@ use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\NutsAndBolts\Color;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
 use Surface\Windows\Primitives\TKTextInput;
+use WeakReference;
 
 /**
  * An editable NSTextField, or NSSecureTextField when secret. Its delegate's
- * controlTextDidChange: posts TextChanged; its action (Return) posts TextSubmitted.
+ * controlTextDidChange: posts TextChanged; its action posts TextSubmitted for Return or keypad
+ * Enter. AppKit sends the action when editing ends too (a Tab out, a click elsewhere, focus moved
+ * from code): that one posts nothing, as GTK's activate and Qt's returnPressed come only for Enter.
  */
 class AppkitTextInput extends TKTextInput
 {
     use AppkitPrimitive;
+
+    private const int RETURN = 36;
+
+    private const int ENTER = 76;
 
     /**
      * Controls hold delegates and targets weakly: the primitive keeps both.
@@ -49,11 +59,13 @@ class AppkitTextInput extends TKTextInput
         $this->built_background = $field->backgroundColor();
         $this->built_draws_background = $field->drawsBackground();
 
+        // The delegate and target hold their callables where PHP's collector cannot see them: a weak reference keeps them from holding the primitive.
+        $self = WeakReference::create($this);
         $this->delegate = new ObjCDelegate('NSTextFieldDelegate');
-        $this->delegate->on('controlTextDidChange:', fn () => $this->typed());
+        $this->delegate->on('controlTextDidChange:', static fn () => $self->get()?->typed());
         $field->setDelegate($this->delegate);
 
-        $this->target = new ObjCTarget(fn () => $this->submitted());
+        $this->target = new ObjCTarget(static fn () => $self->get()?->submitted());
         $field->setTarget($this->target);
         $field->setAction(ObjCTarget::ACTION);
     }
@@ -110,6 +122,10 @@ class AppkitTextInput extends TKTextInput
     protected function submitted(): void
     {
         $this->nativeValueChanged($this->native->stringValue());
+        $event = NSApplication::sharedApplication()->currentEvent();
+        if (! $event instanceof NSEvent || $event->type() !== NSEventType::KEY_DOWN || ! in_array($event->keyCode(), [self::RETURN, self::ENTER], true)) {
+            return;
+        }
         $this->session()->post(new TextSubmitted($this->window->name(), $this->path(), $this->uuid, $this->value));
     }
 }

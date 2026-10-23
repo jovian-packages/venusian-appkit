@@ -17,6 +17,7 @@ use Surface\Contracts\Windows\Primitives\Placement;
 use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\Windows\Primitives\TKDatepicker;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
+use WeakReference;
 
 /**
  * A text-field-and-stepper NSDatePicker showing year, month and day in PHP's default time
@@ -38,7 +39,9 @@ class AppkitDatepicker extends TKDatepicker
     {
         parent::__construct($name, $window, $parent, $placement, $date);
         $this->zone = new DateTimeZone(date_default_timezone_get());
-        $this->target = new ObjCTarget(fn () => $this->picked());
+        // The target holds its callable where PHP's collector cannot see it: a weak reference keeps it from holding the primitive.
+        $self = WeakReference::create($this);
+        $this->target = new ObjCTarget(static fn () => $self->get()?->picked());
 
         $picker = $this->adoptNative(NSDatePicker::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
         $picker->setDatePickerStyle(NSDatePickerStyle::TEXT_FIELD_AND_STEPPER);

@@ -88,6 +88,15 @@ trait AppkitPrimitive
     }
 
     /**
+     * The view that is first responder for this primitive: native(), or the view a scroll view wraps.
+     * @return NSView
+     */
+    public function focusView(): NSView
+    {
+        return $this->native;
+    }
+
+    /**
      * What this primitive contributes to layout: native() unless the kind wraps it.
      * @return NSView
      */
@@ -282,20 +291,52 @@ trait AppkitPrimitive
     }
 
     /**
-     * A hidden view takes no space, and no longer makes its ancestors fill.
+     * A hidden view takes no space, and no longer makes its ancestors fill. A focused view that is
+     * hidden resigns first responder: code's move, so the focus tracker posts nothing.
      *
      * @param bool $visible
      * @return void
      */
     protected function applyVisible(bool $visible): void
     {
-        $this->placedView()->setHidden(! $visible);
+        $this->host()->focusTracker()->quietly(function () use ($visible): void {
+            $this->placedView()->setHidden(! $visible);
+        });
         $this->replaceInAncestors();
     }
 
+    /**
+     * makeFirstResponder: on the focus view, from code: the window's focus tracker posts nothing
+     * for it. AppKit makes any view first responder it is handed, so a view that does not accept
+     * it (a label, a default canvas), or one out of the window (in a tab not selected), is refused here.
+     * @return bool
+     */
+    protected function applyFocus(): bool
+    {
+        $view = $this->focusView();
+        $window = $this->host()->native();
+        if ($view->window() !== $window || ! $view->acceptsFirstResponder()) {
+            return false;
+        }
+        $taken = false;
+        $this->host()->focusTracker()->quietly(function () use ($window, $view, &$taken): void {
+            $taken = $window->makeFirstResponder($view);
+        });
+
+        return $taken;
+    }
+
+    protected function nativeHasFocus(): bool
+    {
+        return $this->host()->focusTracker()->holder() === $this;
+    }
+
+    /** A focused control that is disabled resigns first responder: code's move, so the focus tracker posts nothing. */
     protected function applyEnabled(bool $enabled): void
     {
-        $this->syncNativeEnabled();
+        $this->host()->focusTracker()->quietly(function (): void {
+            $this->syncNativeEnabled();
+        });
     }
 
     /**

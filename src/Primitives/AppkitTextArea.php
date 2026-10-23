@@ -29,6 +29,7 @@ use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\NutsAndBolts\Color;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
 use Surface\Windows\Primitives\TKTextArea;
+use WeakReference;
 
 /**
  * NSTextView::scrollableTextView(): the native is the scroll view, the text view its document.
@@ -94,8 +95,10 @@ class AppkitTextArea extends TKTextArea
         $this->built_background = $this->text->backgroundColor();
         $this->built_draws_background = $this->text->drawsBackground();
 
+        // The delegate holds its callable where PHP's collector cannot see it: a weak reference keeps it from holding the primitive.
+        $self = WeakReference::create($this);
         $this->delegate = new ObjCDelegate('NSTextViewDelegate');
-        $this->delegate->on('textDidChange:', fn () => $this->edited());
+        $this->delegate->on('textDidChange:', static fn () => $self->get()?->edited());
         $this->text->setDelegate($this->delegate);
 
         // A new width wraps the text to a new height.
@@ -121,6 +124,17 @@ class AppkitTextArea extends TKTextArea
     public function native(): NSScrollView
     {
         return $this->native;
+    }
+
+    /** The text view, the scroll view's document: the first responder while the text area has focus. */
+    public function textView(): NSTextView
+    {
+        return $this->text;
+    }
+
+    public function focusView(): NSTextView
+    {
+        return $this->text;
     }
 
     /**

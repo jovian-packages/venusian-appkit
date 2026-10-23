@@ -79,7 +79,7 @@ final class AppkitCanvasClicks implements InputTap
         if ($control) {
             return;
         }
-        [$canvas, $view] = $this->canvasAt($window, $point);
+        [$canvas, $view] = self::canvasAt($window, $point);
         if (! is_null($canvas)) {
             [$x, $y] = AppkitRightClicks::topLeft($view, $point);
             $this->press = [$canvas, $point, $x, $y];
@@ -100,7 +100,7 @@ final class AppkitCanvasClicks implements InputTap
         if (is_null($press)) {
             return;
         }
-        [$canvas] = $this->canvasAt($window, $point);
+        [$canvas] = self::canvasAt($window, $point);
         if ($canvas === $press[0]) {
             $this->session->post(new CanvasClicked($window->name(), $canvas->path(), $canvas->uuid(), $press[2], $press[3]));
         }
@@ -109,11 +109,11 @@ final class AppkitCanvasClicks implements InputTap
     /**
      * The enabled canvas under a window point, and its view: hitTest: walked up superviews to the first
      * a canvas owns (a lent surface's view sits inside it). Null when it or one of its groups is
-     * disabled, or no canvas is there.
+     * disabled, or no canvas is there. Shared with AppkitCanvasPointer, which routes a press the same way.
      *
      * @return array{TKCanvas|null, NSView|null}
      */
-    private function canvasAt(AppkitWindow $window, NSPoint $point): array
+    public static function canvasAt(AppkitWindow $window, NSPoint $point): array
     {
         $content = $window->native()->contentView();
         if (is_null($content)) {

@@ -124,29 +124,6 @@ function appkitContextMail(): array
     return array_values(array_map(fn (object $mail): string => $mail->name(), array_filter(takeMail(session()), fn (object $mail): bool => $mail instanceof RightClicked || $mail instanceof WindowRightClicked || $mail instanceof MenuActivated || $mail instanceof Toggled)));
 }
 
-/**
- * Run $inside once while a menu tracks: a menu tracks in its own run loop mode, and a source in the
- * common modes runs inside it. The returned closure takes the source off.
- */
-function whileTracking(Closure $inside): Closure
-{
-    [$read, $write] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
-    $descriptor = CFFileDescriptor::create(null, streamDescriptor($read), false, function () use ($inside): void {
-        $inside();
-    });
-    $source = $descriptor->createRunLoopSource(null, 0);
-    CFRunLoop::getMain()->addSource($source, kCFRunLoopCommonModes);
-    $descriptor->enableCallBacks(kCFFileDescriptorReadCallBack);
-    fwrite($write, 'x');
-
-    return function () use ($descriptor, $source, $read, $write): void {
-        CFRunLoop::getMain()->removeSource($source, kCFRunLoopCommonModes);
-        $descriptor->invalidate();
-        fclose($write);
-        fclose($read);
-    };
-}
-
 it('opens a primitive\'s context menu at the right press, after its mail, and posts menu.activated for a chosen item', function (): void {
     $window = driver()->open('main', 300, 200);
     $go = $window->column('m')->button('go', 'Go')->setContextMenu([
@@ -238,4 +215,15 @@ it('dispatches what it pumps, except an event a tap withholds', function (): voi
         ->and($clicked())->toBe([])
         ->and(session()->withheld())->toBeNull();
     $window->close();
+});
+
+it('builds a context menu folder with enabled false disabled, and the items below it', function (): void {
+    $menu = new Jovian\Toolkits\Appkit\Windows\AppkitContextMenu(Surface\Windows\Menus\ContextMenu::parse([
+        ['label' => 'Share', 'enabled' => false, 'items' => [['label' => 'Copy Link']]],
+        ['label' => 'Download'],
+    ]), 'main', session());
+
+    expect($menu->node('share')->isEnabled())->toBeFalse()
+        ->and($menu->node('share.copy-link')->isEnabled())->toBeFalse()
+        ->and($menu->node('download')->isEnabled())->toBeTrue();
 });

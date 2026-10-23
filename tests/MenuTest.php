@@ -6,6 +6,8 @@ use Surface\Contracts\Windows\Mail\MenuActivated;
 use Surface\Contracts\Windows\Mail\MenuToggled;
 use Surface\Contracts\Windows\Mail\QuitRequested;
 use Surface\Contracts\Windows\WindowException;
+use Jovian\Toolkits\Appkit\Windows\AppkitMenuBar;
+use Surface\Windows\Menus\Accelerator;
 
 beforeEach(function (): void {
     driver()->closeAll();
@@ -21,7 +23,8 @@ it('builds the profile into the window bar, app menu first', function (): void {
         ->and($menu->itemAtIndex(0)->submenu()->numberOfItems())->toBe(3)
         ->and($menu->itemAtIndex(0)->submenu()->itemAtIndex(1)->isSeparatorItem())->toBeTrue()
         ->and($bar->item('app.quit')->keyEquivalent())->toBe('q')
-        ->and($bar->item('view.refresh')->keyEquivalent())->toBe('r')
+        ->and($bar->item('view.refresh')->keyEquivalent())->toBe(mb_chr(NSF5FunctionKey))
+        ->and($bar->item('view.refresh')->keyEquivalentModifierMask())->toBe(NSEventModifierFlags::COMMAND->value | NSEventModifierFlags::SHIFT->value)
         ->and($bar->item('grid')->state())->toBe(NSControlStateValue::OFF);
 });
 
@@ -139,4 +142,125 @@ it('keeps the default bar built when the same profile is set again', function ()
 
     expect(session()->application()->mainMenu())->toBe($bar)
         ->and($bar->itemAtIndex(1)->submenu()->itemAtIndex(1)->title())->toBe('Refresh');
+});
+
+it('gives each accelerator key its key equivalent', function (string $keys, string $equivalent): void {
+    expect(AppkitMenuBar::keyEquivalent(Accelerator::parse($keys)))->toBe($equivalent);
+})->with([
+    'letter, lower case' => ['Primary+Shift+A', 'a'],
+    'digit' => ['Primary+5', '5'],
+    'punctuation' => ['Primary+]', ']'],
+    'grave' => ['Primary+`', '`'],
+    'F1' => ['F1', mb_chr(0xF704)],
+    'F12' => ['F12', mb_chr(0xF70F)],
+    'up' => ['Alt+UP', mb_chr(0xF700)],
+    'down' => ['Alt+DOWN', mb_chr(0xF701)],
+    'left' => ['Alt+LEFT', mb_chr(0xF702)],
+    'right' => ['Alt+RIGHT', mb_chr(0xF703)],
+    'home' => ['Primary+HOME', mb_chr(0xF729)],
+    'end' => ['Primary+END', mb_chr(0xF72B)],
+    'page up' => ['Primary+PAGE_UP', mb_chr(0xF72C)],
+    'page down' => ['Primary+PAGE_DOWN', mb_chr(0xF72D)],
+    'delete' => ['Primary+DELETE', mb_chr(0xF728)],
+    'backspace' => ['Primary+BACKSPACE', "\x08"],
+    'enter' => ['Primary+ENTER', "\r"],
+    'tab' => ['Primary+TAB', "\t"],
+    'escape' => ['Primary+ESCAPE', "\e"],
+    'space' => ['Primary+SPACE', ' '],
+]);
+
+it('gives each modifier its mask bit', function (): void {
+    expect(AppkitMenuBar::modifierMask(Accelerator::parse('Primary+Ctrl+Alt+Shift+X')))
+        ->toBe(NSEventModifierFlags::COMMAND->value | NSEventModifierFlags::CONTROL->value | NSEventModifierFlags::OPTION->value | NSEventModifierFlags::SHIFT->value)
+        ->and(AppkitMenuBar::modifierMask(Accelerator::parse('Meta+X')))->toBe(NSEventModifierFlags::COMMAND->value)
+        ->and(AppkitMenuBar::modifierMask(Accelerator::parse('F5')))->toBe(0);
+});
+
+it('builds a node with enabled false disabled, and the nodes below it', function (): void {
+    $bar = driver()->open('main', 320, 200, driver()->profile('main'))->menuBar();
+
+    expect($bar->node('view.locked')->isEnabled())->toBeFalse()
+        ->and($bar->node('view.locked.item')->isEnabled())->toBeFalse()
+        ->and($bar->node('view.refresh')->isEnabled())->toBeTrue();
+});
+
+it('disables a folder and the nodes below it, and restores each own state when it is enabled again', function (): void {
+    $window = driver()->open('main', 320, 200, driver()->profile('main'));
+    $bar = $window->menuBar();
+
+    expect($window->setItemEnabled('view', false))->toBe($window)
+        ->and($bar->node('view')->isEnabled())->toBeFalse()
+        ->and($bar->node('view.refresh')->isEnabled())->toBeFalse()
+        ->and($bar->node('view.locked.item')->isEnabled())->toBeFalse()
+        ->and($window->isItemEnabled('view'))->toBeFalse()
+        ->and($window->isItemEnabled('view.refresh'))->toBeTrue();
+
+    $window->setItemEnabled('view', true);
+
+    expect($bar->node('view.refresh')->isEnabled())->toBeTrue()
+        ->and($bar->node('view.locked.item')->isEnabled())->toBeFalse()
+        ->and(takeMail(session()))->toBe([]);
+});
+
+it('chooses items from key presses, and nothing for a disabled item or an item below a disabled folder', function (): void {
+    $window = driver()->open('main', 320, 200, driver()->profile('main'));
+    $menu = $window->menuBar()->menu();
+    $command = NSEventModifierFlags::COMMAND->value;
+    $refresh = fn (): NSEvent => keyDown(96, $command | NSEventModifierFlags::SHIFT->value | NSEventModifierFlags::FUNCTION->value);
+    $next = fn (): NSEvent => keyDown(125, NSEventModifierFlags::OPTION->value | NSEventModifierFlags::FUNCTION->value);
+
+    $chosen = [$menu->performKeyEquivalent($refresh()), $menu->performKeyEquivalent($next()), $menu->performKeyEquivalent(keyDown(30, $command)), $menu->performKeyEquivalent(keyDown(51, $command))];
+    $fired = takeMail(session());
+    $window->setItemEnabled('view.refresh', false);
+    $off = $menu->performKeyEquivalent($refresh());
+    $window->setItemEnabled('view.refresh', true);
+    $window->setItemEnabled('view', false);
+    $folder = $menu->performKeyEquivalent($next());
+
+    expect($chosen)->toBe([true, true, true, true])
+        ->and($fired)->toEqual([new MenuActivated('main', 'view.refresh'), new MenuActivated('main', 'view.next'), new MenuActivated('main', 'view.tab'), new MenuActivated('main', 'view.erase')])
+        ->and($off)->toBeFalse()
+        ->and($folder)->toBeFalse()
+        ->and(takeMail(session()))->toBe([]);
+});
+
+it('refuses an unknown id, an edit role and the first folder', function (): void {
+    $window = driver()->open('main', 320, 200, driver()->profile('editing'));
+
+    expect(fn () => $window->setItemEnabled('nope', false))->toThrow(WindowException::class, "'nope'")
+        ->and(fn () => $window->setItemEnabled('edit.copy', false))->toThrow(WindowException::class, "'Copy'")
+        ->and(fn () => $window->setItemEnabled('edit', false))->toThrow(WindowException::class, "'Edit'")
+        ->and(fn () => $window->setItemEnabled('app', false))->toThrow(WindowException::class, "'App'")
+        ->and(fn () => driver()->open('bare', 320, 200)->setItemEnabled('view', false))->toThrow(WindowException::class, 'no menu bar');
+});
+
+it('starts a new bar from its own profile', function (): void {
+    $window = driver()->open('main', 320, 200, driver()->profile('main'));
+    $window->setItemEnabled('view.refresh', false);
+
+    $window->setMenuBar('main');
+
+    expect($window->isItemEnabled('view.refresh'))->toBeTrue()
+        ->and($window->menuBar()->node('view.refresh')->isEnabled())->toBeTrue();
+});
+
+it('keeps a state of the default bar set before the bar is built', function (): void {
+    driver()->setDefaultMenuBar(null);
+    $tools = driver()->open('tools', 320, 200, driver()->profile('tools'))->present();
+    expect(pumpUntil(fn () => $tools->isKey(), 5.0))->toBeTrue();
+    driver()->setDefaultMenuBar(driver()->profile('main'));
+
+    driver()->setItemEnabled('view.refresh', false);
+    driver()->closeAll();
+    pumpFor(0.05);
+    driver()->showDefaultMenuBar();
+    $refresh = session()->application()->mainMenu()->itemAtIndex(1)->submenu()->itemAtIndex(1);
+
+    expect(driver()->isItemEnabled('view.refresh'))->toBeFalse()
+        ->and($refresh->title())->toBe('Refresh')
+        ->and($refresh->isEnabled())->toBeFalse()
+        ->and(fn () => (function (): void {
+            driver()->setDefaultMenuBar(null);
+            driver()->setItemEnabled('view.refresh', false);
+        })())->toThrow(WindowException::class, 'default');
 });

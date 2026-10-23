@@ -5,6 +5,7 @@ namespace Jovian\Toolkits\Appkit\Bridge;
 use CFFileDescriptor;
 use CFRunLoop;
 use CFRunLoopSource;
+use Closure;
 use Jovian\Toolkits\Appkit\Primitives\AppkitCanvas;
 use Jovian\Toolkits\Appkit\Windows\AppkitStagedWindow;
 use NSApplication;
@@ -35,6 +36,12 @@ class AppkitSession extends BridgedToolkitSession
 
     /** The event a tap asked not to dispatch, until the pump reaches it. */
     private ?NSEvent $withheld = null;
+
+    /**
+     * Run after each event the pump dispatched, keyed by their owner's object id.
+     * @var array<int, Closure(): void>
+     */
+    private array $after_dispatch = [];
 
     /**
      * The loop's waiter descriptor as a run-loop source, while joined.
@@ -106,6 +113,20 @@ class AppkitSession extends BridgedToolkitSession
         return $this->withheld;
     }
 
+    /**
+     * Run $settle after each event the pump dispatches or a tap withheld, once AppKit has finished
+     * with it (a focus tracker compares the first responder then); null stops it for $owner.
+     */
+    public function afterDispatch(object $owner, ?Closure $settle): void
+    {
+        if (is_null($settle)) {
+            unset($this->after_dispatch[spl_object_id($owner)]);
+
+            return;
+        }
+        $this->after_dispatch[spl_object_id($owner)] = $settle;
+    }
+
     public function pump(int $budget_ns): int
     {
         // The wake callout is one-shot: re-armed for each wait, so a descriptor the loop has not
@@ -121,6 +142,9 @@ class AppkitSession extends BridgedToolkitSession
                 $this->withheld = null;
             } else {
                 $this->application->sendEvent($event);
+            }
+            foreach ($this->after_dispatch as $settle) {
+                $settle();
             }
             $dispatched++;
             $until = NSDate::distantPast();

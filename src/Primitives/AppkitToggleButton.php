@@ -12,6 +12,7 @@ use Surface\Contracts\Windows\Primitives\Placement;
 use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
 use Surface\Windows\Primitives\TKToggleButton;
+use WeakReference;
 
 /**
  * A push-on/push-off NSButton: pressed is its ON state; its action posts Toggled.
@@ -28,7 +29,9 @@ class AppkitToggleButton extends TKToggleButton
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement, string $label, bool $pressed)
     {
         parent::__construct($name, $window, $parent, $placement, $label, $pressed);
-        $this->target = new ObjCTarget(fn () => $this->toggled());
+        // The target holds its callable where PHP's collector cannot see it: a weak reference keeps it from holding the primitive.
+        $self = WeakReference::create($this);
+        $this->target = new ObjCTarget(static fn () => $self->get()?->toggled());
         $button = $this->adoptNative(NSButton::buttonWithTitleTargetAction($label, $this->target, ObjCTarget::ACTION));
         $button->setButtonType(NSButtonType::PUSH_ON_PUSH_OFF);
         $button->setState($pressed ? NSControlStateValue::ON : NSControlStateValue::OFF);

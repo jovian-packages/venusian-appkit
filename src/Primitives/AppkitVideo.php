@@ -25,6 +25,7 @@ use Surface\Contracts\Windows\Primitives\Placement;
 use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
 use Surface\Windows\Primitives\TKVideo;
+use WeakReference;
 
 /**
  * An AVPlayerView (inline controls) over one AVPlayer; each file is a new AVPlayerItem.
@@ -63,7 +64,9 @@ class AppkitVideo extends TKVideo
         parent::__construct($name, $window, $parent, $placement, $file);
         $this->player = AVPlayer::playerWithPlayerItem(null);
         $this->player->setActionAtItemEnd(AVPlayerActionAtItemEnd::PAUSE);
-        $this->observer = new ObjCObserver(fn (string $path, ?NSObject $object, array $change, int $context) => $path === 'status' ? $this->statusChanged() : $this->controlChanged());
+        // The observer holds its callable where PHP's collector cannot see it: a weak reference keeps it from holding the primitive.
+        $self = WeakReference::create($this);
+        $this->observer = new ObjCObserver(static fn (string $path, ?NSObject $object, array $change, int $context) => $path === 'status' ? $self->get()?->statusChanged() : $self->get()?->controlChanged());
         $this->observer->observe($this->player, 'timeControlStatus', ObjCObserver::OPTION_NEW, self::KVO_CONTEXT);
 
         $view = $this->adoptNative(AVPlayerView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));

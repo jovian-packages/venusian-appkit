@@ -1,5 +1,29 @@
 # Log
 
+## 2026-10-23
+
+* Review fixes (C9): a disabled focusable canvas (itself or through a container) answers acceptsFirstResponder NO and lets go of focus, as GTK and Qt give a disabled widget none; present()'s hold on the first responder ends at windowDidBecomeKey: (AppKit picks it inside makeKeyAndOrderFront:), so the click that makes the window key posts its focus move; the tracker skips the look through the primitives while firstResponder is unchanged; `setInitialFocus()` refuses another window's primitive.
+
+## 2026-10-22
+
+* Fix: a text input posted TextSubmitted whenever its editing ended (a Tab out, a click elsewhere, present()): AppKit sends the field's action then too. Only Return and keypad Enter post it now, as on GTK and Qt. present() no longer makes an initial focus first responder again when AppKit already did.
+* Focus and window keys (compare-app toolkit C9): `focus()` / `hasFocus()` on every primitive through `focusView()`, `focused()` / `setInitialFocus()` on the window, focus mail compared after each dispatched event (`AppkitFocus`, `AppkitSession::afterDispatch`), focusable canvases (`ObjCFocusView`), `WindowKeyPressed` from the `ObjCKeyWindow`'s `keyDown:` (`AppkitWindowKeys`). Found: a field editor takes every key, F5 included; hide and disable resign first responder, so they run quietly. [windows and menus](architecture/windows-and-menus.md)
+* Dialogs, clipboard and desktop (compare-app toolkit C7): `AppkitDialogs` (alerts and panels as sheets; key equivalents from the roles; `AppkitAlertEscape` answers Esc when the default is also the cancel; the parent's close ends the sheet with `NSModalResponseCancel`), `AppkitClipboard` (`NSPasteboard`), `AppkitDesktop` (`NSWorkspace::openURL`). A window with an open dialog keeps its close button's close. [windows and menus](architecture/windows-and-menus.md)
+
+## 2026-10-20
+
+* Modal children, close veto and button roles (compare-app toolkit C6): a child window is a sheet; `confirmClose()` through `windowShouldClose:`; `AppkitButtonKeys` (Return / Enter / Esc to the role holders); the default bar blocked while a child is key. [windows and menus](architecture/windows-and-menus.md)
+* Menu enabled state and accelerators (compare-app toolkit C5): `setItemEnabled()` on bars, windows and the driver's default profile; `keyEquivalent()` / `modifierMask()` from `Accelerator`; folders in autoenabling Edit menus disabled through a target that lacks the action. [windows and menus](architecture/windows-and-menus.md)
+
+## 2026-10-19
+
+* Canvas pointer and wheel (compare-app toolkit C4): `AppkitCanvasPointer` per window, a session tap after the right clicks, posting `CanvasPressed`, `CanvasDragged`, `CanvasReleased` and `CanvasWheeled` for a canvas that watches the pointer, one press owned at a time; a press a context menu withheld ends at once, a wheel over a watching canvas is withheld from dispatch. `AppkitCanvasClicks::canvasAt()` and `AppkitInputEngine::modifiers()` are public static. [windows and menus](architecture/windows-and-menus.md)
+* Removed primitives are freed. The ext's glue objects (ObjCTarget, ObjCDelegate, ObjCObserver) hold their callables where PHP's collector cannot see them, so a callable capturing `$this` kept the button, checkbox, toggle, toggle button, slider, dropdown, date picker, text input, text area, table, video and tab view alive forever after `remove()`. Each now reaches its primitive through a `WeakReference` from static closures. `FreedTest` builds, removes and collects every kind.
+
+## 2026-10-18
+
+* AppkitTree: an NSOutlineView over one cached NSString item per node id, with label cells in the node's colours. NodeSelected, NodeExpanded and NodeActivated post only for user actions; NodeActivated comes from the double action and from Return / Enter through a key-down monitor. AppKit's own closing and reopening of expanded descendants posts nothing, and a descendant code collapsed while hidden is kept collapsed. Requires ext-appkit ^0.10.3 and Surface contracts and windows ^0.10.3.
+
 ## 2026-10-16
 
 * Composes what ext-appkit 0.10.2 (1:1) no longer decides: layer setters are `setWantsLayer(true)` + `layer()->set…()`, the Metal lend sets `wantsLayer` itself and the reclaim toggles it; `ObjCStageWindow` answers `canBecomeKeyWindow` / `canBecomeMainWindow` from `focusable`; the GL view's draw handler makes its context current and flushes it; CG and I/O Kit return codes and null CFData / CGImage / GL view become `WindowException`; grids pass `NSGridCell::emptyContentView()`.

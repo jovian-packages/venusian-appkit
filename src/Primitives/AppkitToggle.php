@@ -12,6 +12,7 @@ use Surface\Contracts\Windows\Primitives\Placement;
 use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
 use Surface\Windows\Primitives\TKToggle;
+use WeakReference;
 
 /**
  * An NSSwitch; its action posts Toggled with the new state.
@@ -28,7 +29,9 @@ class AppkitToggle extends TKToggle
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement, bool $on)
     {
         parent::__construct($name, $window, $parent, $placement, $on);
-        $this->target = new ObjCTarget(fn () => $this->toggled());
+        // The target holds its callable where PHP's collector cannot see it: a weak reference keeps it from holding the primitive.
+        $self = WeakReference::create($this);
+        $this->target = new ObjCTarget(static fn () => $self->get()?->toggled());
         $switch = $this->adoptNative(NSSwitch::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
         $switch->setState($on ? NSControlStateValue::ON : NSControlStateValue::OFF);
         $switch->setTarget($this->target);

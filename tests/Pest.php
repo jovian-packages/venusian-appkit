@@ -34,7 +34,13 @@ const TEST_MENUS = [
         ]],
         ['label' => 'View', 'items' => [
             ['id' => 'grid', 'label' => 'Show Grid', 'toggle' => true, 'on' => false],
-            ['id' => 'view.refresh', 'label' => 'Refresh', 'hotkey' => 'R'],
+            ['id' => 'view.refresh', 'label' => 'Refresh', 'keys' => 'Primary+Shift+F5'],
+            ['id' => 'view.next', 'label' => 'Next Difference', 'keys' => 'Alt+Down'],
+            ['id' => 'view.tab', 'label' => 'Next Tab', 'keys' => 'Primary+]'],
+            ['id' => 'view.erase', 'label' => 'Erase', 'keys' => 'Primary+BACKSPACE'],
+            ['id' => 'view.locked', 'label' => 'Locked', 'enabled' => false, 'items' => [
+                ['id' => 'view.locked.item', 'label' => 'Item'],
+            ]],
         ]],
     ],
     'tools' => [
@@ -56,6 +62,9 @@ const TEST_MENUS = [
             ['role' => 'select-all', 'label' => 'Select All'],
             ['separator' => true],
             ['id' => 'edit.find', 'label' => 'Find'],
+            ['id' => 'edit.more', 'label' => 'More', 'items' => [
+                ['id' => 'edit.more.item', 'label' => 'Item'],
+            ]],
         ]],
     ],
 ];
@@ -345,4 +354,67 @@ function streamDescriptor($stream): int
     }
 
     throw new RuntimeException('No /dev/fd entry matches the stream');
+}
+
+/** The window (base) point of ($x, $y) measured from $view's top-left, once laid out. */
+function canvasWindowPoint(AppkitWindow $window, NSView $view, float $x, float $y): NSPoint
+{
+    $window->present();
+    pumpUntil(fn (): bool => $view->bounds()->width > 0.0, 3.0);
+    // window → view is a translation, with y turned round when the view is flipped: invert it.
+    $origin = $view->convertPointFromView(new NSPoint(0.0, 0.0), null);
+    $sign = $view->convertPointFromView(new NSPoint(0.0, 1.0), null)->y - $origin->y;
+    $ly = $view->isFlipped() ? $y : $view->bounds()->height - $y;
+
+    return new NSPoint($x - $origin->x, ($ly - $origin->y) / $sign);
+}
+
+function mouseAt(AppkitWindow $window, NSPoint $at, NSEventType $type, int $flags = 0, int $clicks = 1): NSEvent
+{
+    return NSEvent::mouseEventWithTypeLocationModifierFlagsTimestampWindowNumberContextEventNumberClickCountPressure(
+        $type, $at, $flags, 0.0, $window->native()->windowNumber(), null, 0, $clicks, 1.0,
+    );
+}
+
+/**
+ * Run $inside once while a menu tracks: a menu tracks in its own run loop mode, and a source in the
+ * common modes runs inside it. The returned closure takes the source off.
+ */
+function whileTracking(Closure $inside): Closure
+{
+    [$read, $write] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+    $descriptor = CFFileDescriptor::create(null, streamDescriptor($read), false, function () use ($inside): void {
+        $inside();
+    });
+    $source = $descriptor->createRunLoopSource(null, 0);
+    CFRunLoop::getMain()->addSource($source, kCFRunLoopCommonModes);
+    $descriptor->enableCallBacks(kCFFileDescriptorReadCallBack);
+    fwrite($write, 'x');
+
+    return function () use ($descriptor, $source, $read, $write): void {
+        CFRunLoop::getMain()->removeSource($source, kCFRunLoopCommonModes);
+        $descriptor->invalidate();
+        fclose($write);
+        fclose($read);
+    };
+}
+
+/** A key-down event made from a Quartz event, as a key press is: AppKit matches Shift exactly only for one of these. */
+function keyDown(int $virtualKey, int $flags): NSEvent
+{
+    $event = CGEvent::createKeyboardEvent(null, $virtualKey, true);
+    $event->setFlags($flags);
+
+    return NSEvent::eventWithCGEvent($event);
+}
+
+/** A key press, down then up, made from Quartz events, queued at the end and pumped through the session as the user's. */
+function press(int $code, int $flags = 0): void
+{
+    $app = NSApplication::sharedApplication();
+    $up = CGEvent::createKeyboardEvent(null, $code, false);
+    $up->setFlags($flags);
+    $app->postEventAtStart(keyDown($code, $flags), false);
+    $app->postEventAtStart(NSEvent::eventWithCGEvent($up), false);
+    pumpFor(0.15);
 }

@@ -29,6 +29,7 @@ use Surface\Contracts\Windows\Primitives\TKTable;
 use Surface\Contracts\Windows\Primitives\TKTabView;
 use Surface\Contracts\Windows\Primitives\TKTextArea;
 use Surface\Contracts\Windows\Primitives\TKTextInput;
+use Surface\Contracts\Windows\Primitives\TKTree;
 use Surface\Contracts\Windows\Primitives\TKToggle;
 use Surface\Contracts\Windows\Primitives\TKToggleButton;
 use Surface\Contracts\Windows\Primitives\TKVideo;
@@ -127,6 +128,11 @@ class AppkitPrimitiveFactory implements PrimitiveFactory
     public function mintTable(TKPrimitiveGroup $host, string $name, array $columns, array $rows): TKTable
     {
         return new AppkitTable($name, $this->window, $host, $this->placement($host), $columns, $rows);
+    }
+
+    public function mintTree(TKPrimitiveGroup $host, string $name, array $columns, array $nodes): TKTree
+    {
+        return new AppkitTree($name, $this->window, $host, $this->placement($host), $columns, $nodes);
     }
 
     public function mintVideo(TKPrimitiveGroup $host, string $name, ?string $file): TKVideo

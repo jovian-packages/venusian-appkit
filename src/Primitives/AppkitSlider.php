@@ -10,6 +10,7 @@ use Surface\Contracts\Windows\Primitives\Placement;
 use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
 use Surface\Windows\Primitives\TKSlider;
+use WeakReference;
 
 /**
  * A continuous horizontal NSSlider; its action posts ValueChanged as the knob moves.
@@ -26,7 +27,9 @@ class AppkitSlider extends TKSlider
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement, float $min, float $max, float $value)
     {
         parent::__construct($name, $window, $parent, $placement, $min, $max, $value);
-        $this->target = new ObjCTarget(fn () => $this->moved());
+        // The target holds its callable where PHP's collector cannot see it: a weak reference keeps it from holding the primitive.
+        $self = WeakReference::create($this);
+        $this->target = new ObjCTarget(static fn () => $self->get()?->moved());
         $slider = $this->adoptNative(NSSlider::sliderWithValueMinValueMaxValueTargetAction($this->value, $this->min, $this->max, $this->target, ObjCTarget::ACTION));
         $slider->setContinuous(true);
     }

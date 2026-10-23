@@ -18,6 +18,7 @@ use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\NutsAndBolts\Color;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
 use Surface\Windows\Primitives\TKTable;
+use WeakReference;
 
 /**
  * An NSTableView in an NSScrollView (the native), one NSTableColumn per TableColumn, fed by
@@ -56,13 +57,15 @@ class AppkitTable extends TKTable
             $this->table->addTableColumn($native);
         }
 
+        // The data source and delegate hold their callables where PHP's collector cannot see them: a weak reference keeps them from holding the primitive.
+        $self = WeakReference::create($this);
         $this->source = new ObjCDelegate('NSTableViewDataSource');
-        $this->source->on('numberOfRowsInTableView:', fn (): int => count($this->rows));
-        $this->source->on('tableView:objectValueForTableColumn:row:', fn (NSObject $table, NSTableColumn $column, int $row): string => $this->rows[$row][$column->identifier()] ?? '');
+        $this->source->on('numberOfRowsInTableView:', static fn (): int => count($self->get()?->rows ?? []));
+        $this->source->on('tableView:objectValueForTableColumn:row:', static fn (NSObject $table, NSTableColumn $column, int $row): string => $self->get()?->rows[$row][$column->identifier()] ?? '');
         $this->table->setDataSource($this->source);
 
         $this->delegate = new ObjCDelegate('NSTableViewDelegate');
-        $this->delegate->on('tableViewSelectionDidChange:', fn () => $this->selectionChanged());
+        $this->delegate->on('tableViewSelectionDidChange:', static fn () => $self->get()?->selectionChanged());
         $this->table->setDelegate($this->delegate);
 
         $this->built_background = $this->table->backgroundColor();
@@ -74,6 +77,12 @@ class AppkitTable extends TKTable
     public function native(): NSScrollView
     {
         return $this->native;
+    }
+
+    /** The table view, the scroll view's document: the first responder while the table has focus. */
+    public function focusView(): NSTableView
+    {
+        return $this->table;
     }
 
     protected function applyRows(array $cells): void

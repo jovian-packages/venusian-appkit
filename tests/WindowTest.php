@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
+use Surface\Contracts\Windows\Mail\WindowCloseRequested;
 use Surface\Contracts\Windows\Mail\WindowClosed;
 use Surface\Contracts\Windows\Mail\WindowFocused;
 use Surface\Contracts\Windows\WindowException;
@@ -65,6 +66,23 @@ it('posts WindowClosed when the user closes the window', function (): void {
 
     $window->native()->performClose(null);
 
+    expect(takeMail(session()))->toEqual([new WindowClosed('main')])
+        ->and($window->isOpen())->toBeFalse();
+});
+
+it('keeps a confirming window open on the user close and posts WindowCloseRequested', function (): void {
+    $window = driver()->open('main', 320, 200)->present();
+    pumpFor(0.1);
+    takeMail(session());
+
+    expect($window->confirmClose())->toBe($window)
+        ->and($window->isConfirmingClose())->toBeTrue();
+
+    $window->native()->performClose(null);
+    expect(takeMail(session()))->toEqual([new WindowCloseRequested('main')])
+        ->and($window->isOpen())->toBeTrue();
+
+    $window->close();
     expect(takeMail(session()))->toEqual([new WindowClosed('main')])
         ->and($window->isOpen())->toBeFalse();
 });

@@ -12,6 +12,7 @@ use Surface\Contracts\Windows\Primitives\Placement;
 use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\Windows\Primitives\TKDropdown;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
+use WeakReference;
 
 /**
  * A pop-up NSPopUpButton. Options go in as items of its menu, so repeated titles stay
@@ -29,7 +30,9 @@ class AppkitDropdown extends TKDropdown
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement, array $options, int $selected)
     {
         parent::__construct($name, $window, $parent, $placement, $options, $selected);
-        $this->target = new ObjCTarget(fn () => $this->chosen());
+        // The target holds its callable where PHP's collector cannot see it: a weak reference keeps it from holding the primitive.
+        $self = WeakReference::create($this);
+        $this->target = new ObjCTarget(static fn () => $self->get()?->chosen());
         $popup = $this->adoptNative(NSPopUpButton::initWithFramePullsDown(new NSRect(0.0, 0.0, 0.0, 0.0), false));
         $popup->setTarget($this->target);
         $popup->setAction(ObjCTarget::ACTION);

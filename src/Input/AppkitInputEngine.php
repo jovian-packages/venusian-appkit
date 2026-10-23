@@ -426,7 +426,7 @@ final class AppkitInputEngine implements InputEngineDriver, InputTap
         return true;
     }
 
-    private static function modifiers(int $flags): Modifiers
+    public static function modifiers(int $flags): Modifiers
     {
         return new Modifiers(
             shift: ($flags & NSEventModifierFlags::SHIFT->value) !== 0,

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
 use Surface\Contracts\Windows\Mail\View\CanvasClicked;
 
 beforeEach(function (): void {
@@ -10,26 +9,6 @@ beforeEach(function (): void {
     pumpFor(0.05);
     takeMail(session());
 });
-
-/** The window (base) point of ($x, $y) measured from $view's top-left, once laid out. */
-function canvasWindowPoint(AppkitWindow $window, NSView $view, float $x, float $y): NSPoint
-{
-    $window->present();
-    pumpUntil(fn (): bool => $view->bounds()->width > 0.0, 3.0);
-    // window → view is a translation, with y turned round when the view is flipped: invert it.
-    $origin = $view->convertPointFromView(new NSPoint(0.0, 0.0), null);
-    $sign = $view->convertPointFromView(new NSPoint(0.0, 1.0), null)->y - $origin->y;
-    $ly = $view->isFlipped() ? $y : $view->bounds()->height - $y;
-
-    return new NSPoint($x - $origin->x, ($ly - $origin->y) / $sign);
-}
-
-function mouseAt(AppkitWindow $window, NSPoint $at, NSEventType $type, int $flags = 0): NSEvent
-{
-    return NSEvent::mouseEventWithTypeLocationModifierFlagsTimestampWindowNumberContextEventNumberClickCountPressure(
-        $type, $at, $flags, 0.0, $window->native()->windowNumber(), null, 0, 1, 1.0,
-    );
-}
 
 /** @return list<CanvasClicked> the canvas clicks posted since the last read */
 function appkitCanvasClicks(): array

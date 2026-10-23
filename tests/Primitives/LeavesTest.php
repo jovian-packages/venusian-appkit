@@ -187,6 +187,47 @@ it('shows a fraction, or an indeterminate bar for null', function (): void {
         ->and($bar->native()->doubleValue())->toBe(0.5);
 });
 
+it('posts no TextSubmitted when editing ends without Return: a Tab out, a click elsewhere, a present', function (): void {
+    $window = driver()->open('main', 300, 200);
+    $main = $window->column('m');
+    $first = $main->textInput('first', 'one');
+    $main->textInput('second', 'two');
+    $window->setInitialFocus($first);
+    $window->present();
+    pumpUntil(fn (): bool => $window->native()->isKeyWindow(), 3.0);
+    pumpFor(0.1);
+    $at_present = array_values(array_filter(takeMail(session()), fn (object $mail): bool => $mail instanceof TextSubmitted));
+
+    press(48);
+    press(48, NSEventModifierFlags::SHIFT->value);
+
+    expect($at_present)->toBe([])
+        ->and($window->view('m.first')->hasFocus())->toBeTrue()
+        ->and(array_values(array_filter(takeMail(session()), fn (object $mail): bool => $mail instanceof TextSubmitted)))->toBe([]);
+    $window->close();
+});
+
+it('posts one TextSubmitted for one Return, though code moves focus before the key comes up', function (): void {
+    $window = driver()->open('main', 300, 200);
+    $main = $window->column('m');
+    $first = $main->textInput('first', 'one');
+    $second = $main->textInput('second', 'two');
+    $window->present();
+    pumpUntil(fn (): bool => $window->native()->isKeyWindow(), 3.0);
+    $first->focus();
+    takeMail(session());
+
+    // Only the key-down: the Return is still the application's current event when the app reacts.
+    NSApplication::sharedApplication()->postEventAtStart(keyDown(36, 0), false);
+    pumpFor(0.1);
+    $second->focus();
+    pumpFor(0.1);
+
+    expect(array_values(array_filter(takeMail(session()), fn (object $mail): bool => $mail instanceof TextSubmitted)))
+        ->toEqual([new TextSubmitted('main', 'm.first', $first->uuid(), 'one')]);
+    $window->close();
+});
+
 it('reports typing as TextChanged and Return as TextSubmitted; code changes post nothing', function (): void {
     $window = driver()->open('main', 300, 200);
     $main = $window->column('m');
@@ -201,11 +242,15 @@ it('reports typing as TextChanged and Return as TextSubmitted; code changes post
         ->and($secret->native())->toBeInstanceOf(NSSecureTextField::class)
         ->and($secret->native()->stringValue())->toBe('hunter2');
 
+    $window->present();
+    pumpUntil(fn (): bool => $window->native()->isKeyWindow(), 3.0);
+    $input->focus();
+    takeMail(session());
     $input->native()->setStringValue('abc');
     NSNotificationCenter::defaultCenter()->postNotificationNameObject(NSControlTextDidChangeNotification, $input->native());
-    $input->native()->performClick(null);
+    press(36);
 
-    expect(takeMail(session()))->toEqual([
+    expect(viewMail(session()))->toEqual([
         new TextChanged('main', 'm.in', $input->uuid(), 'abc'),
         new TextSubmitted('main', 'm.in', $input->uuid(), 'abc'),
     ])->and($input->value())->toBe('abc');

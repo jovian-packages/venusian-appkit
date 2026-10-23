@@ -16,6 +16,7 @@ use Surface\Contracts\Windows\Primitives\TKPrimitive as Child;
 use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
 use Surface\Windows\Primitives\TKTabView;
+use WeakReference;
 
 /**
  * An NSTabView with one item per page, its identifier the page's name. NSTabView sizes an
@@ -46,8 +47,10 @@ class AppkitTabView extends TKTabView
     {
         parent::__construct($name, $window, $parent, $placement);
         $tabs = $this->adoptNative(NSTabView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
+        // The delegate holds its callable where PHP's collector cannot see it: a weak reference keeps it from holding the primitive.
+        $self = WeakReference::create($this);
         $this->delegate = new ObjCDelegate('NSTabViewDelegate');
-        $this->delegate->on('tabView:didSelectTabViewItem:', fn (NSTabView $view, ?NSTabViewItem $item) => $this->selectedByUser($item));
+        $this->delegate->on('tabView:didSelectTabViewItem:', static fn (NSTabView $view, ?NSTabViewItem $item) => $self->get()?->selectedByUser($item));
         $tabs->setDelegate($this->delegate);
     }
 

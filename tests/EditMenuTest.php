@@ -57,3 +57,23 @@ it('selects all in the focused text input and undoes typing over it', function (
     expect($typed)->toBe('x')
         ->and($input->native()->stringValue())->toBe('hello world');
 });
+
+it('disables an item and a folder in a folder with edit roles, which keep following the first responder', function (): void {
+    $window = driver()->open('main', 320, 200, driver()->profile('editing'));
+    $bar = $window->menuBar();
+    $edit = $bar->item('edit.copy')->menu();
+
+    $window->setItemEnabled('edit.find', false);
+    $window->setItemEnabled('edit.more', false);
+    $edit->update();
+    $off = [$bar->node('edit.find')->isEnabled(), $bar->node('edit.more')->isEnabled(), $bar->node('edit.copy')->isEnabled()];
+    $window->setItemEnabled('edit.find', true);
+    $window->setItemEnabled('edit.more', true);
+    $edit->update();
+
+    expect($off)->toBe([false, false, false])
+        ->and($bar->node('edit.find')->isEnabled())->toBeTrue()
+        ->and($bar->node('edit.more')->isEnabled())->toBeTrue()
+        ->and($bar->node('edit.copy')->isEnabled())->toBeFalse()
+        ->and($bar->node('edit.copy')->action())->toBe('copy:');
+});

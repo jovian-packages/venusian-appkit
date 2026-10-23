@@ -11,6 +11,7 @@ use Surface\Contracts\Windows\Primitives\Placement;
 use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\Windows\Primitives\TKCheckbox;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
+use WeakReference;
 
 /**
  * A checkbox NSButton; its action posts Toggled with the new state.
@@ -27,7 +28,9 @@ class AppkitCheckbox extends TKCheckbox
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement, string $label, bool $checked)
     {
         parent::__construct($name, $window, $parent, $placement, $label, $checked);
-        $this->target = new ObjCTarget(fn () => $this->toggled());
+        // The target holds its callable where PHP's collector cannot see it: a weak reference keeps it from holding the primitive.
+        $self = WeakReference::create($this);
+        $this->target = new ObjCTarget(static fn () => $self->get()?->toggled());
         $box = $this->adoptNative(NSButton::checkboxWithTitleTargetAction($label, $this->target, ObjCTarget::ACTION));
         $box->setState($checked ? NSControlStateValue::ON : NSControlStateValue::OFF);
     }
