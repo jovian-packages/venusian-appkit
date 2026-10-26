@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Surface\Contracts\Windows\Mail\MenuActivated;
+use Surface\Contracts\Windows\Mail\MenuRadioChosen;
 use Surface\Contracts\Windows\Mail\MenuToggled;
 use Surface\Contracts\Windows\Mail\QuitRequested;
 use Surface\Contracts\Windows\WindowException;
@@ -263,4 +264,76 @@ it('keeps a state of the default bar set before the bar is built', function (): 
             driver()->setDefaultMenuBar(null);
             driver()->setItemEnabled('view.refresh', false);
         })())->toThrow(WindowException::class, 'default');
+});
+
+function caseStates(AppkitMenuBar $bar): array
+{
+    return array_map(fn (string $id): bool => $bar->item($id)->state() === NSControlStateValue::ON, ['case.none' => 'case.none', 'case.unimportant' => 'case.unimportant', 'case.all' => 'case.all']);
+}
+
+it('sets a radio group\'s item on and the rest off, posting nothing', function (): void {
+    $window = driver()->open('main', 320, 200, driver()->profile('choices'));
+
+    expect(caseStates($window->menuBar()))->toBe(['case.none' => true, 'case.unimportant' => false, 'case.all' => false]);
+
+    $window->setRadio('ignore-case', 'case.all');
+
+    expect(caseStates($window->menuBar()))->toBe(['case.none' => false, 'case.unimportant' => false, 'case.all' => true])
+        ->and($window->radio('ignore-case'))->toBe('case.all')
+        ->and(takeMail(session()))->toBe([])
+        ->and(fn () => $window->setRadio('ignore-case', 'compare.wrap'))->toThrow(WindowException::class, "'compare.wrap' is not in radio group 'ignore-case'.")
+        ->and(fn () => $window->setRadio('nope', 'case.all'))->toThrow(WindowException::class, "No radio group 'nope'");
+});
+
+it('posts MenuRadioChosen for the user\'s choice, and nothing for the item already on', function (): void {
+    $window = driver()->open('main', 320, 200, driver()->profile('choices'));
+
+    choose($window->menuBar()->item('case.unimportant'));
+    choose($window->menuBar()->item('case.unimportant'));
+
+    expect(takeMail(session()))->toEqual([new MenuRadioChosen('main', 'ignore-case', 'case.unimportant')])
+        ->and($window->radio('ignore-case'))->toBe('case.unimportant')
+        ->and(caseStates($window->menuBar()))->toBe(['case.none' => false, 'case.unimportant' => true, 'case.all' => false]);
+});
+
+it('disables one radio item on its own, and relabels an item and a folder', function (): void {
+    $window = driver()->open('main', 320, 200, driver()->profile('choices'));
+
+    $window->setItemEnabled('case.all', false);
+    $window->setItemLabel('case.none', 'Nothing');
+    $window->setItemLabel('compare', 'Diff');
+
+    expect($window->menuBar()->node('case.all')->isEnabled())->toBeFalse()
+        ->and($window->menuBar()->node('case.none')->isEnabled())->toBeTrue()
+        ->and($window->menuBar()->item('case.none')->title())->toBe('Nothing')
+        ->and($window->itemLabel('case.none'))->toBe('Nothing')
+        ->and($window->menuBar()->node('compare')->title())->toBe('Diff')
+        ->and($window->menuBar()->node('compare')->submenu()->title())->toBe('Diff')
+        ->and(takeMail(session()))->toBe([]);
+});
+
+it('keeps the default bar\'s radios, toggles and labels through a window\'s own bar', function (): void {
+    driver()->setDefaultMenuBar(driver()->profile('choices'));
+    driver()->setRadio('ignore-case', 'case.all');
+    driver()->setToggle('compare.wrap', true);
+    driver()->setItemLabel('compare.wrap', 'Wrap Lines');
+    $tools = driver()->open('tools', 320, 200, driver()->profile('tools'))->present();
+    pumpUntil(fn () => $tools->isKey(), 5.0);
+    driver()->closeAll();
+    pumpFor(0.05);
+    driver()->showDefaultMenuBar();
+    $compare = session()->application()->mainMenu()->itemAtIndex(1)->submenu();
+
+    expect(driver()->radio('ignore-case'))->toBe('case.all')
+        ->and(driver()->isToggled('compare.wrap'))->toBeTrue()
+        ->and(driver()->itemLabel('compare.wrap'))->toBe('Wrap Lines')
+        ->and($compare->itemAtIndex(2)->state())->toBe(NSControlStateValue::ON)
+        ->and($compare->itemAtIndex(0)->state())->toBe(NSControlStateValue::OFF)
+        ->and($compare->itemAtIndex(4)->title())->toBe('Wrap Lines')
+        ->and($compare->itemAtIndex(4)->state())->toBe(NSControlStateValue::ON);
+
+    choose($compare->itemAtIndex(1));
+    expect(driver()->radio('ignore-case'))->toBe('case.unimportant')
+        ->and(array_values(array_filter(takeMail(session()), fn (object $mail): bool => $mail instanceof MenuRadioChosen)))->toEqual([new MenuRadioChosen('', 'ignore-case', 'case.unimportant')]);
+    driver()->setDefaultMenuBar(driver()->profile('main'));
 });

@@ -4,6 +4,7 @@ namespace Jovian\Toolkits\Appkit\Primitives\Concerns;
 
 use Jovian\Toolkits\Appkit\Bridge\AppkitSession;
 use Jovian\Toolkits\Appkit\Primitives\AppkitFixed;
+use Jovian\Toolkits\Appkit\Windows\AppkitContextMenu;
 use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
 use NSColor;
 use NSControl;
@@ -14,15 +15,18 @@ use NSLayoutConstraintOrientation;
 use NSNotificationCenter;
 use NSObject;
 use NSOperationQueue;
+use NSPoint;
 use NSRect;
 use NSStackView;
 use NSView;
 use Surface\Contracts\Windows\Mail\View\ViewResized;
+use Surface\Contracts\Windows\Menus\ContextMenu as ContextMenuContract;
 use Surface\Contracts\Windows\Primitives\Align;
 use Surface\Contracts\Windows\Primitives\TKPrimitive;
 use Surface\Contracts\Windows\Styling\FontSpec;
 use Surface\Contracts\Windows\Styling\FontWeight;
 use Surface\NutsAndBolts\Color;
+use Surface\Windows\Menus\ContextMenu;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
 
 /**
@@ -329,6 +333,38 @@ trait AppkitPrimitive
     protected function nativeHasFocus(): bool
     {
         return $this->host()->focusTracker()->holder() === $this;
+    }
+
+    /** The menu popupMenu() has open, while AppKit tracks it; null otherwise. */
+    private ?AppkitContextMenu $popup = null;
+
+    public function openPopup(): ?AppkitContextMenu
+    {
+        return $this->popup;
+    }
+
+    /**
+     * Open $menu at ($x, $y) from the view's top-left, flipped into the view's own coordinates. An
+     * owned canvas press ends first, as for a right click. AppKit tracks the menu in its own loop:
+     * this returns when the menu closes. False, opening nothing, while the window is not on screen.
+     */
+    protected function applyPopupMenu(ContextMenuContract $menu, float $x, float $y): bool
+    {
+        $window = $this->host();
+        if (! $window->native()->isVisible() || ! $menu instanceof ContextMenu) {
+            return false;
+        }
+        $window->canvasPointer()->interrupt();
+        $view = $this->native;
+        $point = new NSPoint($x, $view->isFlipped() ? $y : $view->bounds()->height - $y);
+        $this->popup = new AppkitContextMenu($menu, $window->name(), $this->session());
+        try {
+            $this->popup->popupAt($view, $point);
+        } finally {
+            $this->popup = null;
+        }
+
+        return true;
     }
 
     /** A focused control that is disabled resigns first responder: code's move, so the focus tracker posts nothing. */

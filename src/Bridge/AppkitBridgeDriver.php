@@ -208,6 +208,49 @@ class AppkitBridgeDriver extends ToolkitBridgeDriver implements BridgeContract, 
         return $this->defaultStates()->isEnabled($item);
     }
 
+    /**
+     * The default bar's toggles, radios and labels: kept in its states, which a bar built later
+     * (and the bar now, sharing them) shows. Post nothing.
+     * @throws WindowException
+     */
+    public function setToggle(string $item, bool $on): void
+    {
+        $this->defaultStates()->setToggle($item, $on);
+        $this->default_bar?->setToggle($item, $on);
+    }
+
+    /** @throws WindowException */
+    public function isToggled(string $item): bool
+    {
+        return $this->defaultStates()->toggle($item);
+    }
+
+    /** @throws WindowException */
+    public function setRadio(string $group, string $item): void
+    {
+        $this->defaultStates()->setRadio($group, $item);
+        $this->default_bar?->setRadio($group, $item);
+    }
+
+    /** @throws WindowException */
+    public function radio(string $group): string
+    {
+        return $this->defaultStates()->radio($group);
+    }
+
+    /** @throws WindowException */
+    public function setItemLabel(string $item, string $label): void
+    {
+        $this->defaultStates()->setLabel($item, $label);
+        $this->default_bar?->setItemLabel($item, $label);
+    }
+
+    /** @throws WindowException */
+    public function itemLabel(string $item): string
+    {
+        return $this->defaultStates()->label($item);
+    }
+
     protected function defaultStates(): MenuStates
     {
         return $this->default_states ?? throw new WindowException('No default menu bar profile is set.');
@@ -247,10 +290,8 @@ class AppkitBridgeDriver extends ToolkitBridgeDriver implements BridgeContract, 
         }
 
         if (is_null($this->default_bar)) {
-            $this->default_bar = new AppkitMenuBar($this->session, $this->default_menu, null, $this->about());
-            foreach ($this->default_states->changes() as $id => $enabled) {
-                $this->default_bar->setItemEnabled($id, $enabled);
-            }
+            // The bar builds from the driver's states and keeps them: what was set before, and the user's choices since, survive a rebuild.
+            $this->default_bar = new AppkitMenuBar($this->session, $this->default_menu, null, $this->about(), $this->default_states);
         }
         $this->default_bar->block($blocked);
         $this->default_bar->install();

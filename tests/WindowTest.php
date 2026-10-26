@@ -6,6 +6,7 @@ use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
 use Surface\Contracts\Windows\Mail\WindowCloseRequested;
 use Surface\Contracts\Windows\Mail\WindowClosed;
 use Surface\Contracts\Windows\Mail\WindowFocused;
+use Surface\Contracts\Windows\Mail\WindowScaleChanged;
 use Surface\Contracts\Windows\WindowException;
 
 beforeEach(function (): void {
@@ -95,4 +96,21 @@ it('closes every window', function (): void {
 
     expect(driver()->all())->toBe([])
         ->and(takeMail(session()))->toEqual([new WindowClosed('a'), new WindowClosed('b')]);
+});
+
+it('posts WindowScaleChanged when the backing scale changes, and nothing for the same scale', function (): void {
+    $window = driver()->open('main', 200, 100);
+    $window->present();
+    pumpFor(0.2);
+    takeMail(session());
+
+    // One display here: the handler runs with the factor unchanged, then with the last one posted set off by hand.
+    $window->backingChanged();
+    $same = array_filter(takeMail(session()), fn (object $mail): bool => $mail instanceof WindowScaleChanged);
+    (fn () => $this->backing_scale = 0.5)->call($window);
+    $window->backingChanged();
+
+    expect($same)->toBe([])
+        ->and(array_values(array_filter(takeMail(session()), fn (object $mail): bool => $mail instanceof WindowScaleChanged)))->toEqual([new WindowScaleChanged('main', $window->native()->backingScaleFactor())]);
+    $window->close();
 });

@@ -16,6 +16,7 @@ use Surface\Contracts\Windows\Mail\WindowCloseRequested;
 use Surface\Contracts\Windows\Mail\WindowClosed;
 use Surface\Contracts\Windows\Mail\WindowFocused;
 use Surface\Contracts\Windows\Mail\WindowResized;
+use Surface\Contracts\Windows\Mail\WindowScaleChanged;
 use Surface\Contracts\Windows\Primitives\TKPrimitive;
 use Surface\Contracts\Windows\Primitives\TKPrimitiveGroup;
 use Surface\Contracts\Windows\ToolkitWindow;
@@ -63,6 +64,11 @@ class AppkitWindow implements ToolkitWindow
 
     protected AppkitCanvasPointer $canvas_pointer;
 
+    protected AppkitCanvasHover $canvas_hover;
+
+    /** The backing scale last posted, or seen at open. */
+    private float $backing_scale;
+
     protected AppkitButtonKeys $button_keys;
 
     protected AppkitFocus $focus;
@@ -107,11 +113,15 @@ class AppkitWindow implements ToolkitWindow
         $this->delegate->on('windowShouldClose:', fn (): bool => $this->shouldClose());
         $this->delegate->on('windowWillClose:', fn () => $this->closed());
         $this->delegate->on('windowDidResize:', fn () => $this->resized());
+        $this->delegate->on('windowDidChangeBackingProperties:', fn () => $this->backingChanged());
+        $this->backing_scale = $this->window->backingScaleFactor();
         $this->window->setDelegate($this->delegate);
         $this->right_clicks = new AppkitRightClicks($this, $session);
         $this->canvas_clicks = new AppkitCanvasClicks($this, $session);
         // Tapped after the right clicks: a press their menu withheld arrives here already withheld.
         $this->canvas_pointer = new AppkitCanvasPointer($this, $session);
+        // Tapped after the pointer: it sees a release after the pointer posted its CanvasReleased.
+        $this->canvas_hover = new AppkitCanvasHover($this, $session);
         $this->button_keys = new AppkitButtonKeys($this, $session);
         $this->focus = new AppkitFocus($this, $this->window, $session);
         $this->window_keys = new AppkitWindowKeys($this, $this->window);
@@ -299,6 +309,30 @@ class AppkitWindow implements ToolkitWindow
         return $this->menuOrFail()->isItemEnabled($item);
     }
 
+    public function setRadio(string $group, string $item): static
+    {
+        $this->menuOrFail()->setRadio($group, $item);
+
+        return $this;
+    }
+
+    public function radio(string $group): string
+    {
+        return $this->menuOrFail()->radio($group);
+    }
+
+    public function setItemLabel(string $item, string $label): static
+    {
+        $this->menuOrFail()->setItemLabel($item, $label);
+
+        return $this;
+    }
+
+    public function itemLabel(string $item): string
+    {
+        return $this->menuOrFail()->itemLabel($item);
+    }
+
     /**
      * The content area in points: what the content container is laid out in.
      * @return array{int, int}
@@ -363,6 +397,25 @@ class AppkitWindow implements ToolkitWindow
     }
 
     /** The window's canvas presses, drags, releases and wheels, posted as mail. */
+    public function canvasHover(): AppkitCanvasHover
+    {
+        return $this->canvas_hover;
+    }
+
+    /**
+     * The delegate's windowDidChangeBackingProperties: (another display, a display setting): posts
+     * WindowScaleChanged when the backing scale differs from the last posted.
+     */
+    public function backingChanged(): void
+    {
+        $scale = $this->window->backingScaleFactor();
+        if ($scale === $this->backing_scale) {
+            return;
+        }
+        $this->backing_scale = $scale;
+        $this->session->post(new WindowScaleChanged($this->name, $scale));
+    }
+
     public function canvasPointer(): AppkitCanvasPointer
     {
         return $this->canvas_pointer;
@@ -435,6 +488,7 @@ class AppkitWindow implements ToolkitWindow
         $this->right_clicks->detach();
         $this->canvas_clicks->detach();
         $this->canvas_pointer->detach();
+        $this->canvas_hover->detach();
         $this->button_keys->detach();
         $this->focus->detach();
         $this->window_keys->detach();

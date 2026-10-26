@@ -11,6 +11,7 @@ use NSView;
 use Surface\Contracts\HumanInput\InputTap;
 use Surface\Contracts\Windows\Mail\View\CanvasClicked;
 use Surface\Contracts\Windows\Primitives\TKCanvas;
+use Surface\Contracts\Windows\Primitives\TKPrimitive;
 use WeakReference;
 
 /**
@@ -115,13 +116,25 @@ final class AppkitCanvasClicks implements InputTap
      */
     public static function canvasAt(AppkitWindow $window, NSPoint $point): array
     {
+        return self::primitiveAt($window, $point, TKCanvas::class);
+    }
+
+    /**
+     * The enabled primitive of $kind under a window point, and its view, found as canvasAt() finds a canvas.
+     *
+     * @template T of TKPrimitive
+     * @param class-string<T> $kind
+     * @return array{T|null, NSView|null}
+     */
+    public static function primitiveAt(AppkitWindow $window, NSPoint $point, string $kind): array
+    {
         $content = $window->native()->contentView();
         if (is_null($content)) {
             return [null, null];
         }
         $owners = [];
         foreach ($window->registry()->all() as $primitive) {
-            if ($primitive instanceof TKCanvas) {
+            if ($primitive instanceof $kind) {
                 foreach (['native', 'placedView'] as $view) {
                     if (method_exists($primitive, $view)) {
                         $owners[spl_object_id($primitive->{$view}())] = $primitive;
@@ -131,17 +144,17 @@ final class AppkitCanvasClicks implements InputTap
         }
         $frame = $content->superview();
         for ($view = $content->hitTest(is_null($frame) ? $point : $frame->convertPointFromView($point, null)); ! is_null($view); $view = $view->superview()) {
-            $canvas = $owners[spl_object_id($view)] ?? null;
-            if (is_null($canvas)) {
+            $found = $owners[spl_object_id($view)] ?? null;
+            if (is_null($found)) {
                 continue;
             }
-            for ($at = $canvas; ! is_null($at); $at = $at->parent()) {
+            for ($at = $found; ! is_null($at); $at = $at->parent()) {
                 if (! $at->isEnabled()) {
                     return [null, null];
                 }
             }
 
-            return [$canvas, $view];
+            return [$found, $view];
         }
 
         return [null, null];

@@ -194,3 +194,50 @@ it('titles, selects and removes pages without mail, and posts TabSelected for a 
         ->and($mail[0]->name())->toBe('view.tab-selected.main.m.sessions')
         ->and($tabs->selected())->toBe('three');
 });
+
+it('keeps its tab strip and tallest page under a filling sibling, clear of the next one', function (): void {
+    $window = driver()->open('main', 400, 300);
+    $root = $window->column('root', 6, 8);
+    $root->row('body', 0)->fill()->canvas('rows');
+    $tabs = $root->tabs('tabs');
+    $one = $tabs->addPage('one', 'One');
+    $one->label('l', 'Page one');
+    $two = $tabs->addPage('two', 'Two');
+    foreach (['a', 'b', 'c'] as $name) {
+        $two->label($name, "Line {$name}");
+    }
+    $button = $root->button('insert', 'Insert Tab');
+    $window->present();
+    pumpFor(0.3);
+    $window->native()->contentView()->layoutSubtreeIfNeeded();
+
+    // Both as the column arranges them: a placed view is the primitive's view or its slot.
+    $frame = $tabs->placedView()->frame();
+    $strip = $tabs->native()->frame()->height - $tabs->native()->selectedTabViewItem()->view()->frame()->height;
+    $tallest = max($one->native()->fittingSize()->height, $two->native()->fittingSize()->height);
+    $below = $button->placedView()->frame();
+
+    // Frames hold the bezels around what AppKit draws (the column spaces those): the button's
+    // middle is below the tab view's frame, in the column's unflipped coordinates.
+    expect($frame->height)->toBeGreaterThanOrEqual($strip + $tallest - 0.5)
+        ->and($tallest)->toBeGreaterThan(40.0)
+        ->and($below->y + $below->height / 2)->toBeLessThan($frame->y);
+    $window->close();
+});
+
+it('inserts a tab before the one at an index, and posts no TabSelected', function (): void {
+    $window = driver()->open('main', 400, 300);
+    $tabs = $window->column('m')->tabs('tabs');
+    $tabs->addPage('one', 'One');
+    $tabs->addPage('two', 'Two');
+    takeMail(session());
+
+    $tabs->addPage('first', 'First', 0);
+    $tabs->addPage('middle', 'Middle', 2);
+
+    $labels = array_map(fn (NSTabViewItem $item): string => $item->label(), $tabs->native()->tabViewItems());
+    expect($labels)->toBe(['First', 'One', 'Middle', 'Two'])
+        ->and($tabs->pages())->toBe(['first', 'one', 'middle', 'two'])
+        ->and(array_filter(takeMail(session()), fn (object $mail): bool => $mail instanceof TabSelected))->toBe([]);
+    $window->close();
+});

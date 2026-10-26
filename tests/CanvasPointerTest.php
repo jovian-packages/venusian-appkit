@@ -303,3 +303,29 @@ it('sees what the session pumps, and stops when its window closes', function ():
     expect($pumped)->toBe(['CanvasPressed:left', 'CanvasDragged:left', 'CanvasReleased:left'])
         ->and($pointer->watching())->toBeFalse();
 });
+
+/** A precise scroll with Quartz's gesture phase (field 99: began 1, changed 2, ended 4, cancelled 8, may-begin 128) and momentum phase (field 123: begin 1, continue 2, end 3). */
+function phasedScroll(int $phase, int $momentum): NSEvent
+{
+    $quartz = CGEvent::createScrollWheelEvent2(null, CGScrollEventUnit::PIXEL, 1, -2, 0, 0);
+    $quartz->setIntegerValueField(99, $phase);
+    $quartz->setIntegerValueField(123, $momentum);
+
+    return NSEvent::eventWithCGEvent($quartz);
+}
+
+it('gives a wheel its gesture phase, and posts nothing for a phase without movement', function (): void {
+    [$window, , $board] = appkitPointerWindow();
+    $at = canvasWindowPoint($window, $board->native(), 20.0, 20.0);
+    takeMail(session());
+    $pointer = $window->canvasPointer();
+
+    foreach ([[1, 0], [2, 0], [4, 0], [0, 1], [0, 2], [0, 3], [128, 0], [8, 0]] as [$phase, $momentum]) {
+        $pointer->seen(phasedScroll($phase, $momentum), $at);
+    }
+    $notch = scrollEvent(new NSPoint(0.0, 0.0), CGScrollEventUnit::LINE, -1);
+    $pointer->seen($notch, $at);
+
+    expect(array_map(fn (Surface\Contracts\Windows\Mail\View\CanvasWheeled $mail): string => $mail->phase->value, appkitPointerMail()))
+        ->toBe(['began', 'changed', 'ended', 'momentum', 'momentum', 'momentum-ended', 'ended', 'none']);
+});

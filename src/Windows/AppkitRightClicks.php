@@ -106,18 +106,22 @@ final class AppkitRightClicks implements InputTap
             $primitive = $owners[spl_object_id($view)] ?? null;
             if ($primitive instanceof TKPrimitive) {
                 $menu = null;
+                $owner = null;
                 for ($at = $primitive; ! is_null($at); $at = $at->parent()) {
                     if (! $at->isEnabled()) {
                         return false;
                     }
-                    $menu ??= $at->contextMenu();
+                    if (is_null($menu) && ! is_null($at->contextMenu())) {
+                        [$menu, $owner] = [$at->contextMenu(), $at];
+                    }
                 }
                 [$x, $y] = self::topLeft($view, $point);
                 $this->session->post(new RightClicked($window->name(), $primitive->path(), $primitive->uuid(), $x, $y));
                 if (! $menu instanceof ContextMenu) {
                     return false;
                 }
-                $this->menu = new AppkitContextMenu($menu, $window->name(), $this->session);
+                // The owner keeps the user's toggle and radio choices: the next open shows them.
+                $this->menu = new AppkitContextMenu($menu, $window->name(), $this->session, null, $owner);
                 $this->menu->popupAt($view, $view->convertPointFromView($point, null));
 
                 return true;

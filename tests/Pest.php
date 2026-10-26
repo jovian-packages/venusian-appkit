@@ -43,6 +43,17 @@ const TEST_MENUS = [
             ]],
         ]],
     ],
+    'choices' => [
+        ['label' => 'App', 'items' => [['role' => 'quit', 'label' => 'Quit', 'hotkey' => 'q']]],
+        ['id' => 'compare', 'label' => 'Compare', 'items' => [
+            ['id' => 'case.none', 'label' => 'None', 'radio' => 'ignore-case', 'on' => true],
+            ['id' => 'case.unimportant', 'label' => 'Unimportant', 'radio' => 'ignore-case'],
+            ['id' => 'case.all', 'label' => 'All', 'radio' => 'ignore-case'],
+            ['separator' => true],
+            ['id' => 'compare.wrap', 'label' => 'Wrap', 'toggle' => true],
+            ['id' => 'compare.more', 'label' => 'More', 'items' => [['id' => 'compare.more.deep', 'label' => 'Deep']]],
+        ]],
+    ],
     'tools' => [
         ['label' => 'Tools', 'items' => [
             ['id' => 'tools.measure', 'label' => 'Measure'],

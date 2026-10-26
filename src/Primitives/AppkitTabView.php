@@ -5,6 +5,7 @@ namespace Jovian\Toolkits\Appkit\Primitives;
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use NSLayoutConstraint;
 use NSRect;
+use NSSize;
 use NSTabView;
 use NSTabViewItem;
 use NSView;
@@ -43,6 +44,14 @@ class AppkitTabView extends TKTabView
      */
     protected array $pins = [];
 
+    /**
+     * @var array<string, NSView> page name => its column's view
+     */
+    protected array $views = [];
+
+    /** @var list<NSLayoutConstraint> the least width and height: the tab strip and the widest and tallest page */
+    protected array $least = [];
+
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement)
     {
         parent::__construct($name, $window, $parent, $placement);
@@ -59,14 +68,15 @@ class AppkitTabView extends TKTabView
         return $this->native;
     }
 
-    protected function insertPage(TKColumn $page, string $title): void
+    protected function insertPage(TKColumn $page, string $title, ?int $index): void
     {
         $item = NSTabViewItem::initWithIdentifier($page->name());
         $item->setLabel($title);
         $item->setView(NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
         $this->items[$page->name()] = $item;
         $this->placeChild($page);
-        $this->quietly(fn () => $this->native->addTabViewItem($item));
+        $this->quietly(fn () => is_null($index) ? $this->native->addTabViewItem($item) : $this->native->insertTabViewItemAtIndex($item, $index));
+        $this->fitPages();
         $page->syncNativeEnabled();
         $this->replaceInAncestors();
     }
@@ -93,8 +103,10 @@ class AppkitTabView extends TKTabView
             $view->bottomAnchor()->constraintEqualToAnchor($holder->bottomAnchor()),
         ];
         NSLayoutConstraint::activateConstraints($this->pins[$child->name()]);
+        $this->views[$child->name()] = $view;
         $child->nativeHug(true, false);
         $child->nativeHug(false, false);
+        $this->fitPages();
     }
 
     /**
@@ -111,8 +123,60 @@ class AppkitTabView extends TKTabView
             $item = $this->items[$name];
             $this->quietly(fn () => $this->native->removeTabViewItem($item));
         }
-        unset($this->items[$name], $this->pins[$name]);
+        unset($this->items[$name], $this->pins[$name], $this->views[$name]);
+        $this->fitPages();
         $this->replaceInAncestors();
+    }
+
+    /**
+     * Keep the tab view at least as big as its tab strip and its biggest page, as GTK's and Qt's
+     * are: NSTabView sizes a page's holder by frame, so the page's constraints give it no size,
+     * and a filling sibling squeezed it to nothing. The least sizes hold at 750, over a fill's
+     * pulls and a window drag.
+     *
+     * @return void
+     */
+    protected function fitPages(): void
+    {
+        NSLayoutConstraint::deactivateConstraints($this->least);
+        $strip = self::strip();
+        $width = 0.0;
+        $height = 0.0;
+        foreach ($this->views as $view) {
+            $size = $view->fittingSize();
+            $width = max($width, $size->width);
+            $height = max($height, $size->height);
+        }
+        $this->least = [
+            $this->native->widthAnchor()->constraintGreaterThanOrEqualToConstant($strip->width + $width),
+            $this->native->heightAnchor()->constraintGreaterThanOrEqualToConstant($strip->height + $height),
+        ];
+        foreach ($this->least as $least) {
+            $least->setPriority(750.0);
+        }
+        NSLayoutConstraint::activateConstraints($this->least);
+    }
+
+    /**
+     * What a tab view keeps around a page: its frame less the frame it gives an item's view. A
+     * tab view with no frame yet gives none, and fits to the page alone: a scratch one with a
+     * frame is measured, once.
+     *
+     * @return NSSize
+     */
+    protected static function strip(): NSSize
+    {
+        static $strip = null;
+        if (is_null($strip)) {
+            $tabs = NSTabView::initWithFrame(new NSRect(0.0, 0.0, 300.0, 200.0));
+            $item = NSTabViewItem::initWithIdentifier('measure');
+            $item->setView(NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
+            $tabs->addTabViewItem($item);
+            $page = $item->view()->frame();
+            $strip = new NSSize(300.0 - $page->width, 200.0 - $page->height);
+        }
+
+        return $strip;
     }
 
     protected function applyTitle(TKColumn $page, string $title): void

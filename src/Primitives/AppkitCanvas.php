@@ -9,6 +9,8 @@ use CGImage;
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use Jovian\Toolkits\Appkit\Windows\Concerns\LendsAppkitSurfaces;
 use NSRect;
+use NSTrackingArea;
+use NSTrackingAreaOptions;
 use NSView;
 use NSWindow;
 use ObjCFocusView;
@@ -42,6 +44,11 @@ class AppkitCanvas extends TKCanvas
 
     protected static ?CGColorSpace $space = null;
 
+    private const int TRACKING = NSTrackingAreaOptions::MOUSE_ENTERED_AND_EXITED->value | NSTrackingAreaOptions::MOUSE_MOVED->value
+        | NSTrackingAreaOptions::ACTIVE_IN_ACTIVE_APP->value | NSTrackingAreaOptions::IN_VISIBLE_RECT->value;
+
+    protected NSTrackingArea $tracking;
+
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement)
     {
         parent::__construct($name, $window, $parent, $placement);
@@ -52,6 +59,20 @@ class AppkitCanvas extends TKCanvas
         // The view holds the handler, and this canvas the view: a weak reference breaks the cycle.
         $self = WeakReference::create($this);
         $view->on('acceptsFirstResponder', static fn (): bool => $self->get()?->acceptsFocus() ?? false);
+        // Enters, exits and moves for AppkitCanvasHover, which posts them while the canvas watches the pointer.
+        $this->tracking = NSTrackingArea::initWithRectOptionsOwnerUserInfo(new NSRect(0.0, 0.0, 0.0, 0.0), self::TRACKING, $view, null);
+        $view->addTrackingArea($this->tracking);
+    }
+
+    /** The canvas view's tracking area: AppkitCanvasHover knows its canvas by it. */
+    public function trackingArea(): NSTrackingArea
+    {
+        return $this->tracking;
+    }
+
+    protected function releaseNative(): void
+    {
+        $this->native->removeTrackingArea($this->tracking);
     }
 
     /** The enabled state the user sees: this canvas's own, unless a container above it is disabled. */

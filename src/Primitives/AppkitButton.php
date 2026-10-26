@@ -2,8 +2,12 @@
 
 namespace Jovian\Toolkits\Appkit\Primitives;
 
+use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitButtonImage;
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use NSButton;
+use NSCellImagePosition;
+use Surface\Contracts\Framebuffers\Framebuffer;
+use Surface\Contracts\Windows\Primitives\ImagePosition;
 use ObjCTarget;
 use Surface\Contracts\Windows\Mail\View\ButtonClicked;
 use Surface\Contracts\Windows\Primitives\ButtonRole;
@@ -22,6 +26,7 @@ use WeakReference;
 class AppkitButton extends TKButton
 {
     use AppkitPrimitive;
+    use AppkitButtonImage;
 
     /**
      * Controls hold their targets weakly: the primitive keeps it.
@@ -65,6 +70,17 @@ class AppkitButton extends TKButton
     protected function applyRole(?ButtonRole $role): void
     {
         $this->native->setKeyEquivalent($role === ButtonRole::DEFAULT ? "\r" : '');
+    }
+
+    protected function applyImage(?Framebuffer $image, ImagePosition $position, float $scale): void
+    {
+        $this->native->setImage(is_null($image) ? null : self::nsImage($image, $scale));
+        $this->native->setImagePosition(is_null($image) ? NSCellImagePosition::NO_IMAGE : self::cellPosition($position));
+    }
+
+    protected function applyBordered(bool $on): void
+    {
+        $this->native->setBordered($on);
     }
 
     protected function releaseNative(): void

@@ -9,6 +9,7 @@ use NSEventModifierFlags;
 use NSMenuItem;
 use ObjCTarget;
 use Surface\Contracts\Windows\Mail\MenuActivated;
+use Surface\Contracts\Windows\Mail\MenuRadioChosen;
 use Surface\Contracts\Windows\Mail\MenuToggled;
 use Surface\Contracts\Windows\Mail\QuitRequested;
 use Surface\Contracts\Windows\Menus\MenuRole;
@@ -50,6 +51,12 @@ class AppkitMenuBar
     protected array $toggles = [];
 
     /**
+     * Each radio group's item natives, by item id.
+     * @var array<string, array<string, NSMenuItem>>
+     */
+    protected array $groups = [];
+
+    /**
      * Every node by id: items and folders.
      * @var array<string, NSMenuItem>
      */
@@ -81,16 +88,18 @@ class AppkitMenuBar
      * @param MenuProfile $profile
      * @param string|null $window the window it belongs to; null for the app's default bar, whose items post '' (Quit posts null)
      * @param array{name?: string|null, version?: string|null, copyright?: string|null} $about
+     * @param MenuStates|null $states the states to build from and keep: the driver's for the default bar, which outlives a rebuild; null starts from the profile
      */
     public function __construct(
         protected readonly AppkitSession $session,
         protected readonly MenuProfile $profile,
         protected readonly ?string $window,
         protected readonly array $about,
+        ?MenuStates $states = null,
     ) {
         $this->main = NSMenu::initWithTitle('MainMenu');
         $this->main->setAutoenablesItems(false);
-        $this->states = new MenuStates($profile);
+        $this->states = $states ?? new MenuStates($profile);
 
         foreach ($profile->folders as $folder) {
             $this->main->addItem($this->folder($folder));
@@ -210,12 +219,53 @@ class AppkitMenuBar
 
     public function setToggle(string $item, bool $on): void
     {
-        $this->toggle($item)->setState($on ? NSControlStateValue::ON : NSControlStateValue::OFF);
+        $native = $this->toggle($item);
+        $this->states->setToggle($item, $on);
+        $native->setState($on ? NSControlStateValue::ON : NSControlStateValue::OFF);
+    }
+
+    /** @throws WindowException When no radio group has the name, or the item is not in it. */
+    public function setRadio(string $group, string $item): void
+    {
+        $this->states->setRadio($group, $item);
+        $this->showRadio($group);
+    }
+
+    /** @throws WindowException When no radio group has the name. */
+    public function radio(string $group): string
+    {
+        return $this->states->radio($group);
+    }
+
+    /** A folder's slot and its submenu, or an item, show the label. @throws WindowException When no node has the id. */
+    public function setItemLabel(string $item, string $label): void
+    {
+        $this->states->setLabel($item, $label);
+        $native = $this->node($item);
+        $native->setTitle($label);
+        $native->submenu()?->setTitle($label);
+    }
+
+    /** @throws WindowException When no node has the id. */
+    public function itemLabel(string $item): string
+    {
+        return $this->states->label($item);
+    }
+
+    /** Every item of $group shows off but the one on. */
+    protected function showRadio(string $group): void
+    {
+        $on = $this->states->radio($group);
+        foreach ($this->groups[$group] as $id => $native) {
+            $native->setState($id === $on ? NSControlStateValue::ON : NSControlStateValue::OFF);
+        }
     }
 
     public function isToggled(string $item): bool
     {
-        return $this->toggle($item)->state() === NSControlStateValue::ON;
+        $this->toggle($item);
+
+        return $this->states->toggle($item);
     }
 
     /**
@@ -245,9 +295,10 @@ class AppkitMenuBar
 
     protected function folder(MenuItem $folder): NSMenuItem
     {
-        $slot = NSMenuItem::initWithTitleActionKeyEquivalent($folder->label, null, '');
+        $label = $this->states->label($folder->id);
+        $slot = NSMenuItem::initWithTitleActionKeyEquivalent($label, null, '');
         $this->nodes[$folder->id] = $slot;
-        $menu = NSMenu::initWithTitle($folder->label);
+        $menu = NSMenu::initWithTitle($label);
         // A folder with edit items validates them against the first responder; others stay as built.
         $menu->setAutoenablesItems(array_any($folder->items, fn (MenuItem $item): bool => $item->role?->isEdit() === true));
 
@@ -269,7 +320,7 @@ class AppkitMenuBar
         if ($item->role?->isEdit() === true) {
             [$action, $key] = self::EDIT[$item->role->value];
             // No target: AppKit sends the action up the responder chain from the first responder.
-            $native = NSMenuItem::initWithTitleActionKeyEquivalent($item->label, $action, $key);
+            $native = NSMenuItem::initWithTitleActionKeyEquivalent($this->states->label($item->id), $action, $key);
             $this->items[$item->id] = $native;
             $this->nodes[$item->id] = $native;
             $this->roles[$item->id] = true;
@@ -277,7 +328,7 @@ class AppkitMenuBar
             return $native;
         }
 
-        $native = NSMenuItem::initWithTitleActionKeyEquivalent($item->label, ObjCTarget::ACTION, is_null($item->keys) ? '' : self::keyEquivalent($item->keys));
+        $native = NSMenuItem::initWithTitleActionKeyEquivalent($this->states->label($item->id), ObjCTarget::ACTION, is_null($item->keys) ? '' : self::keyEquivalent($item->keys));
         if (! is_null($item->keys)) {
             $native->setKeyEquivalentModifierMask(self::modifierMask($item->keys));
         }
@@ -287,9 +338,19 @@ class AppkitMenuBar
             $item->role === MenuRole::ABOUT => fn () => $this->session->showAbout($this->about),
             $item->role === MenuRole::QUIT => fn () => $this->session->post(new QuitRequested($this->window)),
             $item->toggle => function () use ($native, $item, $window): void {
-                $on = $native->state() !== NSControlStateValue::ON;
+                $on = ! $this->states->toggle($item->id);
+                $this->states->setToggle($item->id, $on);
                 $native->setState($on ? NSControlStateValue::ON : NSControlStateValue::OFF);
                 $this->session->post(new MenuToggled($window, $item->id, $on));
+            },
+            ! is_null($item->radio()) => function () use ($item, $window): void {
+                $group = $item->radio();
+                if ($this->states->radio($group) === $item->id) {
+                    return;
+                }
+                $this->states->setRadio($group, $item->id);
+                $this->showRadio($group);
+                $this->session->post(new MenuRadioChosen($window, $group, $item->id));
             },
             default => fn () => $this->session->post(new MenuActivated($window, $item->id)),
         });
@@ -300,8 +361,12 @@ class AppkitMenuBar
         $this->nodes[$item->id] = $native;
         $this->roles[$item->id] = false;
         if ($item->toggle) {
-            $native->setState($item->on ? NSControlStateValue::ON : NSControlStateValue::OFF);
+            $native->setState($this->states->toggle($item->id) ? NSControlStateValue::ON : NSControlStateValue::OFF);
             $this->toggles[$item->id] = $native;
+        }
+        if (! is_null($item->radio())) {
+            $native->setState($this->states->radio($item->radio()) === $item->id ? NSControlStateValue::ON : NSControlStateValue::OFF);
+            $this->groups[$item->radio()][$item->id] = $native;
         }
 
         return $native;

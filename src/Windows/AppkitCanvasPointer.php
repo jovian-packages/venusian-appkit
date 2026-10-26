@@ -4,7 +4,9 @@ namespace Jovian\Toolkits\Appkit\Windows;
 
 use Jovian\Toolkits\Appkit\Bridge\AppkitSession;
 use Jovian\Toolkits\Appkit\Input\AppkitInputEngine;
+use Jovian\Toolkits\Appkit\Primitives\AppkitScrollBar;
 use NSEvent;
+use NSEventPhase;
 use NSEventType;
 use NSPoint;
 use NSView;
@@ -15,6 +17,7 @@ use Surface\Contracts\Windows\Mail\View\CanvasDragged;
 use Surface\Contracts\Windows\Mail\View\CanvasPressed;
 use Surface\Contracts\Windows\Mail\View\CanvasReleased;
 use Surface\Contracts\Windows\Mail\View\CanvasWheeled;
+use Surface\Contracts\Windows\Mail\View\ScrollPhase;
 use Surface\Contracts\Windows\Primitives\TKCanvas;
 use WeakReference;
 
@@ -113,6 +116,34 @@ final class AppkitCanvasPointer implements InputTap
     }
 
     /** A mouse event's button: left and right by type (a built event's button number reads 0), others by number: 2 middle, 3 and 4 the side buttons. */
+    /** Whether a press is owned: AppkitCanvasHover posts nothing while one is. */
+    public function pressing(): bool
+    {
+        return ! is_null($this->holding());
+    }
+
+    /**
+     * The wheel's place in a gesture: the momentum phase first, then the gesture's; null for a phase
+     * that moves nothing (MayBegin, Stationary). A cancelled gesture ends.
+     */
+    public static function phase(NSEvent $event): ?ScrollPhase
+    {
+        $bits = static fn (NSEventPhase|int $phase): int => $phase instanceof NSEventPhase ? $phase->value : $phase;
+        $momentum = $bits($event->momentumPhase());
+        if ($momentum !== NSEventPhase::NONE->value) {
+            return ($momentum & (NSEventPhase::ENDED->value | NSEventPhase::CANCELLED->value)) !== 0 ? ScrollPhase::MOMENTUM_ENDED : ScrollPhase::MOMENTUM;
+        }
+        $phase = $bits($event->phase());
+
+        return match (true) {
+            $phase === NSEventPhase::NONE->value => ScrollPhase::NONE,
+            ($phase & (NSEventPhase::ENDED->value | NSEventPhase::CANCELLED->value)) !== 0 => ScrollPhase::ENDED,
+            ($phase & NSEventPhase::CHANGED->value) !== 0 => ScrollPhase::CHANGED,
+            ($phase & NSEventPhase::BEGAN->value) !== 0 => ScrollPhase::BEGAN,
+            default => null,
+        };
+    }
+
     public static function button(NSEvent $event): ?MouseButton
     {
         return match ($event->type()) {
@@ -185,16 +216,28 @@ final class AppkitCanvasPointer implements InputTap
 
     private function wheeled(AppkitWindow $window, NSEvent $event, NSPoint $point): void
     {
+        // AppKit passes a wheel over a scroller on: the bar moves itself.
+        [$bar] = AppkitCanvasClicks::primitiveAt($window, $point, AppkitScrollBar::class);
+        if (! is_null($bar)) {
+            $bar->wheel($event);
+            $this->session->withhold($event);
+
+            return;
+        }
         [$canvas] = AppkitCanvasClicks::canvasAt($window, $point);
         if (is_null($canvas) || ! $canvas->isWatchingPointer()) {
+            return;
+        }
+        $this->session->withhold($event);
+        $phase = self::phase($event);
+        if (is_null($phase)) {
             return;
         }
         $this->session->post(new CanvasWheeled(
             $window->name(), $canvas->path(), $canvas->uuid(),
             -$event->scrollingDeltaX(), -$event->scrollingDeltaY(), $event->hasPreciseScrollingDeltas(),
-            AppkitInputEngine::modifiers($event->modifierFlags()),
+            AppkitInputEngine::modifiers($event->modifierFlags()), $phase,
         ));
-        $this->session->withhold($event);
     }
 
     /**
