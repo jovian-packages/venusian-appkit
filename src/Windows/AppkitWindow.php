@@ -444,6 +444,8 @@ class AppkitWindow implements ToolkitWindow
     {
         $this->key = true;
         $this->focus->becameKey();
+        // AppKit has no pasteboard notification: another app's copy shows when the app comes back.
+        $this->driver->clipboard()->compare();
 
         if (! is_null($this->parent)) {
             // A child has no bar: the default bar shows, blocked, so the parent's input stops there too.

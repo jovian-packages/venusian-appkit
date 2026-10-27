@@ -1,5 +1,9 @@
 # Log
 
+## 2026-10-27
+
+* Services: alert styles (`NSAlertStyle`) and the suppression button (answered as `suppressed`); `supports()` gives `ShowHidden`, not `AlertTitle`; panel filters as `UTType`s from the patterns' extensions (a pattern with none throws) and hidden files; `AppkitClipboard` reads text, `hasText()`, and posts `ClipboardChanged` on its own `setText()` and when a window becomes key after the pasteboard's count moved. Needs ext-appkit's NSAlert style and suppression, NSSavePanel content types and hidden files, UTType and NSPasteboard change count. [windows and menus](architecture/windows-and-menus.md)
+
 ## 2026-10-26
 
 * Canvas keys: `AppkitCanvasKeys` on a canvas's `ObjCFocusView` posts `KeyPressed`, `KeyReleased`, `TextCommitted` (through `interpretKeyEvents:` and the view's input context) and `EditCommanded` (the standard key-binding selectors); a focused canvas takes every key, so `WindowKeyPressed` posts only with no canvas focused. Needs ext-appkit 3fdc6bf. [windows and menus](architecture/windows-and-menus.md)

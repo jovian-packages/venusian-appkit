@@ -86,7 +86,7 @@ class AppkitBridgeDriver extends ToolkitBridgeDriver implements BridgeContract, 
 
     public function clipboard(): AppkitClipboard
     {
-        return $this->clipboard ??= new AppkitClipboard();
+        return $this->clipboard ??= new AppkitClipboard($this->connect());
     }
 
     public function desktop(): AppkitDesktop

@@ -7,6 +7,8 @@ use Surface\Contracts\Windows\Mail\Services\FilesChosen;
 use Surface\Contracts\Windows\Mail\WindowCloseRequested;
 use Surface\Contracts\Windows\Mail\WindowClosed;
 use Surface\Contracts\Windows\Services\Alert;
+use Surface\Contracts\Windows\Services\AlertStyle;
+use Surface\Contracts\Windows\Services\DialogCapability;
 use Surface\Contracts\Windows\Services\OpenRequest;
 use Surface\Contracts\Windows\Services\SaveRequest;
 use Surface\Contracts\Windows\WindowException;
@@ -36,7 +38,7 @@ function sheetKey(NSWindow $sheet, int $code): void
 function dialogMail(): array
 {
     return array_values(array_filter(array_map(fn (object $mail): ?string => match (true) {
-        $mail instanceof AlertAnswered => "alert:{$mail->button}",
+        $mail instanceof AlertAnswered => "alert:{$mail->button}" . ($mail->suppressed ? ':suppressed' : ''),
         $mail instanceof FilesChosen => 'files:' . implode(',', $mail->paths),
         $mail instanceof WindowClosed => "closed:{$mail->window}",
         $mail instanceof WindowCloseRequested => "requested:{$mail->window}",
@@ -169,6 +171,96 @@ it('shows a panel for a missing directory', function (): void {
     [$main, $id, $panel] = withSheet(fn ($main) => driver()->dialogs()->openFiles($main, new OpenRequest(directory: '/nonexistent-c7')));
 
     expect($panel)->toBeInstanceOf(NSOpenPanel::class);
+    $main->close();
+});
+
+it('shows a styled alert with a suppression box and answers whether it was ticked', function (bool $ticked): void {
+    [$main, $id, $sheet] = withSheet(fn ($main) => driver()->dialogs()->alert($main, new Alert('Delete?', null, ['Delete', 'Cancel'], style: AlertStyle::Warning, suppression: 'Don\'t ask again')));
+    $alert = driver()->dialogs()->native($id);
+    $box = $alert->suppressionButton();
+
+    expect($alert->alertStyle())->toBe(NSAlertStyle::WARNING)
+        ->and($alert->showsSuppressionButton())->toBeTrue()
+        ->and($box->title())->toBe('Don\'t ask again');
+
+    $box->setState($ticked ? NSControlStateValue::ON : NSControlStateValue::OFF);
+    $main->native()->endSheetReturnCode($sheet, NSAlertFirstButtonReturn);
+    pumpFor(0.3);
+
+    expect(dialogMail())->toBe([$ticked ? 'alert:0:suppressed' : 'alert:0']);
+})->with(['ticked' => true, 'not ticked' => false]);
+
+it('maps each alert style to NSAlert\'s', function (?AlertStyle $style, NSAlertStyle $native): void {
+    [$main, $id] = withSheet(fn ($main) => driver()->dialogs()->alert($main, new Alert('Hi', style: $style)));
+
+    expect(driver()->dialogs()->native($id)->alertStyle())->toBe($native)
+        ->and(driver()->dialogs()->native($id)->showsSuppressionButton())->toBeFalse();
+    $main->close();
+})->with([
+    'plain' => [null, NSAlertStyle::WARNING],
+    'info' => [AlertStyle::Info, NSAlertStyle::INFORMATIONAL],
+    'warning' => [AlertStyle::Warning, NSAlertStyle::WARNING],
+    'critical' => [AlertStyle::Critical, NSAlertStyle::CRITICAL],
+]);
+
+it('has no alert titles and shows hidden files', function (): void {
+    $main = driver()->open('main', 480, 320);
+
+    expect(driver()->dialogs()->supports(DialogCapability::AlertTitle))->toBeFalse()
+        ->and(driver()->dialogs()->supports(DialogCapability::ShowHidden))->toBeTrue()
+        ->and(fn () => driver()->dialogs()->alert($main, new Alert('Hi', title: 'Greeting')))->toThrow(WindowException::class, 'title')
+        ->and(driver()->dialogs()->openOn($main))->toBeNull();
+});
+
+it('answers a styled alert -1 and not suppressed when the parent closes', function (): void {
+    [$main, $id] = withSheet(fn ($main) => driver()->dialogs()->alert($main, new Alert('Delete?', style: AlertStyle::Critical, suppression: 'Don\'t ask again')));
+    driver()->dialogs()->native($id)->suppressionButton()->setState(NSControlStateValue::ON);
+    $main->close();
+    pumpFor(0.6);
+
+    expect(dialogMail())->toBe(['alert:-1', 'closed:main']);
+});
+
+it('allows the types of the filters\' extensions and shows hidden files', function (string $kind): void {
+    $request = ['filters' => ['Text' => ['*.txt', '*.md'], 'Archives' => ['*.tar.gz']], 'showHidden' => true];
+    [$main, $id, $panel] = withSheet(fn ($main) => $kind === 'open'
+        ? driver()->dialogs()->openFiles($main, new OpenRequest(...$request))
+        : driver()->dialogs()->saveFile($main, new SaveRequest(...$request)));
+
+    expect(array_map(fn (UTType $type): string => $type->identifier(), $panel->allowedContentTypes()))->toBe([
+        'public.plain-text',
+        UTType::typeWithFilenameExtension('md')->identifier(),
+        UTType::typeWithFilenameExtension('gz')->identifier(),
+    ])
+        ->and($panel->showsHiddenFiles())->toBeTrue();
+    $main->close();
+})->with(['open', 'save']);
+
+it('allows every type for a catch-all pattern', function (string $all): void {
+    [$main, $id, $panel] = withSheet(fn ($main) => driver()->dialogs()->openFiles($main, new OpenRequest(filters: ['Text' => ['*.txt'], 'All files' => [$all]])));
+
+    expect($panel->allowedContentTypes())->toBe([]);
+    $main->close();
+})->with(['*', '*.*']);
+
+it('refuses a pattern that is not a catch-all or one extension', function (string $pattern): void {
+    $main = driver()->open('main', 480, 320);
+
+    expect(fn () => driver()->dialogs()->openFiles($main, new OpenRequest(filters: ['C' => [$pattern]])))->toThrow(InvalidArgumentException::class, $pattern)
+        ->and(driver()->dialogs()->openOn($main))->toBeNull();
+})->with(['*.[ch]', '*.{c,h}', '*.']);
+
+it('refuses a filter pattern with no extension, and the parent shows the next request', function (): void {
+    $main = driver()->open('main', 480, 320);
+    $main->present();
+
+    expect(fn () => driver()->dialogs()->openFiles($main, new OpenRequest(filters: ['Make' => ['Makefile']])))->toThrow(InvalidArgumentException::class, 'Makefile')
+        ->and(driver()->dialogs()->openOn($main))->toBeNull()
+        ->and($main->native()->attachedSheet())->toBeNull();
+
+    $id = driver()->dialogs()->openFiles($main, new OpenRequest());
+    pumpUntil(fn (): bool => ! is_null($main->native()->attachedSheet()), 2.0);
+    expect(driver()->dialogs()->openOn($main))->toBe($id);
     $main->close();
 });
 

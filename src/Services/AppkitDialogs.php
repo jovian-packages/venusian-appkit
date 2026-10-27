@@ -3,19 +3,25 @@
 namespace Jovian\Toolkits\Appkit\Services;
 
 use Closure;
+use InvalidArgumentException;
 use Jovian\Toolkits\Appkit\Bridge\AppkitBridgeDriver;
 use Jovian\Toolkits\Appkit\Bridge\AppkitSession;
 use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
 use NSAlert;
+use NSAlertStyle;
+use NSControlStateValue;
 use NSOpenPanel;
 use NSSavePanel;
 use NSURL;
 use NSWindow;
 use Surface\Contracts\Windows\Services\Alert;
+use Surface\Contracts\Windows\Services\AlertStyle;
+use Surface\Contracts\Windows\Services\DialogCapability;
 use Surface\Contracts\Windows\Services\OpenRequest;
 use Surface\Contracts\Windows\Services\SaveRequest;
 use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\Windows\Services\ToolkitDialogs;
+use UTType;
 use Voyager\Contracts\Signals\NamedSignal;
 use WeakReference;
 
@@ -37,11 +43,34 @@ final class AppkitDialogs extends ToolkitDialogs
         parent::__construct($driver);
     }
 
+    /** An alert is a sheet, which has no title bar. */
+    public function supports(DialogCapability $capability): bool
+    {
+        return $capability === DialogCapability::ShowHidden;
+    }
+
+    /** The NSAlert or panel of an open request, or null. */
+    public function native(string $id): NSAlert|NSSavePanel|null
+    {
+        return $this->sheets[$id]['native'] ?? null;
+    }
+
     protected function showAlert(string $id, ToolkitWindow $parent, Alert $alert): void
     {
         $native = NSAlert::init();
         $native->setMessageText($alert->message);
         $native->setInformativeText($alert->detail ?? '');
+        if (! is_null($alert->style)) {
+            $native->setAlertStyle(match ($alert->style) {
+                AlertStyle::Info => NSAlertStyle::INFORMATIONAL,
+                AlertStyle::Warning => NSAlertStyle::WARNING,
+                AlertStyle::Critical => NSAlertStyle::CRITICAL,
+            });
+        }
+        if (! is_null($alert->suppression)) {
+            $native->setShowsSuppressionButton(true);
+            $native->suppressionButton()->setTitle($alert->suppression);
+        }
         foreach ($alert->buttons as $index => $label) {
             $button = $native->addButtonWithTitle($label);
             // AppKit gives Return to the first button; the roles say which button takes Return and Esc.
@@ -53,8 +82,13 @@ final class AppkitDialogs extends ToolkitDialogs
         }
         $holder = $this->parentWindow($parent);
         $weak = WeakReference::create($this);
-        $native->beginSheetModalForWindowCompletionHandler($holder, static function (int $code) use ($weak, $id): void {
-            $weak->get()?->ended($id, fn (): int => $code - NSAlertFirstButtonReturn);
+        $native->beginSheetModalForWindowCompletionHandler($holder, static function (int $code) use ($weak, $id, $native): void {
+            $self = $weak->get();
+            $self?->ended($id, static fn () => $self->answerAlert(
+                $id,
+                $code - NSAlertFirstButtonReturn,
+                $native->showsSuppressionButton() && $native->suppressionButton()?->state() === NSControlStateValue::ON,
+            ));
         });
         $sheet = $native->window();
         // One button holds one key equivalent: when the default is also the cancel, a tap answers Esc.
@@ -68,10 +102,13 @@ final class AppkitDialogs extends ToolkitDialogs
 
     protected function showOpen(string $id, ToolkitWindow $parent, OpenRequest $request): void
     {
+        $types = self::contentTypes($request->filters);
         $panel = NSOpenPanel::openPanel();
         $panel->setCanChooseFiles(! $request->folders);
         $panel->setCanChooseDirectories($request->folders);
         $panel->setAllowsMultipleSelection($request->multiple);
+        $panel->setAllowedContentTypes($types);
+        $panel->setShowsHiddenFiles($request->showHidden);
         $this->begin($id, $parent, $panel, $request->title, $request->directory, static fn (NSOpenPanel $panel): array => array_map(
             static fn (NSURL $url): ?string => $url->path(),
             $panel->URLs(),
@@ -80,10 +117,13 @@ final class AppkitDialogs extends ToolkitDialogs
 
     protected function showSave(string $id, ToolkitWindow $parent, SaveRequest $request): void
     {
+        $types = self::contentTypes($request->filters);
         $panel = NSSavePanel::savePanel();
         if (! is_null($request->name)) {
             $panel->setNameFieldStringValue($request->name);
         }
+        $panel->setAllowedContentTypes($types);
+        $panel->setShowsHiddenFiles($request->showHidden);
         $this->begin($id, $parent, $panel, $request->title, $request->directory, static fn (NSSavePanel $panel): array => [$panel->URL()?->path()]);
     }
 
@@ -102,15 +142,43 @@ final class AppkitDialogs extends ToolkitDialogs
 
     /**
      * The sheet ended: let go of it, then answer. An id the parent's close already ended answers nothing.
-     * @param Closure(): (int|list<string>) $answer
+     * @param Closure(): void $answer calls answerAlert() or answerFiles()
      */
     private function ended(string $id, Closure $answer): void
     {
         if (is_null($this->release($id))) {
             return;
         }
-        $value = $answer();
-        is_int($value) ? $this->answerAlert($id, $value) : $this->answerFiles($id, $value);
+        $answer();
+    }
+
+    /**
+     * Every filter's types together: an NSSavePanel shows no filter names. A pattern's type is
+     * its extension's, the letters and digits after its last dot. `*` or `*.*` allows every type,
+     * so the whole set is [].
+     * @param array<string, list<string>> $filters
+     * @return list<UTType>
+     * @throws InvalidArgumentException When a pattern is neither a catch-all nor one plain extension.
+     */
+    private static function contentTypes(array $filters): array
+    {
+        $types = [];
+        foreach ($filters as $patterns) {
+            foreach ($patterns as $pattern) {
+                if ($pattern === '*' || $pattern === '*.*') {
+                    return [];
+                }
+                if (preg_match('/\.([A-Za-z0-9]+)$/', $pattern, $match) !== 1) {
+                    throw new InvalidArgumentException("AppKit filters files by one plain extension, and the pattern '{$pattern}' has none.");
+                }
+                $type = UTType::typeWithFilenameExtension($match[1]);
+                if (! is_null($type)) {
+                    $types[] = $type;
+                }
+            }
+        }
+
+        return $types;
     }
 
     /**
@@ -128,9 +196,10 @@ final class AppkitDialogs extends ToolkitDialogs
         $holder = $this->parentWindow($parent);
         $weak = WeakReference::create($this);
         $panel->beginSheetModalForWindowCompletionHandler($holder, static function (int $result) use ($weak, $id, $panel, $chosen): void {
-            $weak->get()?->ended($id, static fn (): array => $result === NSModalResponseOK
+            $self = $weak->get();
+            $self?->ended($id, static fn () => $self->answerFiles($id, $result === NSModalResponseOK
                 ? array_values(array_filter($chosen($panel), static fn (?string $path): bool => ! is_null($path)))
-                : []);
+                : []));
         });
         $this->sheets[$id] = ['native' => $panel, 'parent' => $holder, 'sheet' => $panel, 'tap' => null];
     }
