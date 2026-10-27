@@ -49,6 +49,8 @@ class AppkitCanvas extends TKCanvas
 
     protected NSTrackingArea $tracking;
 
+    private AppkitCanvasKeys $keys;
+
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement)
     {
         parent::__construct($name, $window, $parent, $placement);
@@ -59,6 +61,8 @@ class AppkitCanvas extends TKCanvas
         // The view holds the handler, and this canvas the view: a weak reference breaks the cycle.
         $self = WeakReference::create($this);
         $view->on('acceptsFirstResponder', static fn (): bool => $self->get()?->acceptsFocus() ?? false);
+        // Keys, commands and committed text while the view is first responder.
+        $this->keys = new AppkitCanvasKeys($this, $view);
         // Enters, exits and moves for AppkitCanvasHover, which posts them while the canvas watches the pointer.
         $this->tracking = NSTrackingArea::initWithRectOptionsOwnerUserInfo(new NSRect(0.0, 0.0, 0.0, 0.0), self::TRACKING, $view, null);
         $view->addTrackingArea($this->tracking);
@@ -72,6 +76,7 @@ class AppkitCanvas extends TKCanvas
 
     protected function releaseNative(): void
     {
+        $this->keys->detach();
         $this->native->removeTrackingArea($this->tracking);
     }
 

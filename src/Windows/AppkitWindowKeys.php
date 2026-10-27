@@ -65,7 +65,8 @@ final class AppkitWindowKeys
     }
 
     /** The layout's text for the key: '' for a control character and for AppKit's function-key characters (U+F700–U+F8FF). */
-    private static function character(string $characters): string
+    /** The layout's text for a key: its first character, '' for a control, delete or function-key character. Shared with the canvas keys. */
+    public static function character(string $characters): string
     {
         if ($characters === '') {
             return '';

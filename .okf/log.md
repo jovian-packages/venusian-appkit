@@ -1,5 +1,10 @@
 # Log
 
+## 2026-10-26
+
+* Canvas keys: `AppkitCanvasKeys` on a canvas's `ObjCFocusView` posts `KeyPressed`, `KeyReleased`, `TextCommitted` (through `interpretKeyEvents:` and the view's input context) and `EditCommanded` (the standard key-binding selectors); a focused canvas takes every key, so `WindowKeyPressed` posts only with no canvas focused. Needs ext-appkit 3fdc6bf. [windows and menus](architecture/windows-and-menus.md)
+* Canvas keys: the Edit menu's actions post `EditCommanded` on a focused canvas (needs ext-appkit 202f4e6); a key held with Command posts its release (local key-up monitor); a modifier released while focus was away posts its own key's release. [windows and menus](architecture/windows-and-menus.md)
+
 ## 2026-10-24
 
 * By-eye fix (C12): `AppkitScrollBar` is always a legacy scroller at legacy width: a standalone overlay scroller draws its track and never its knob (only an NSScrollView flashes one, through no public call). The system-style observer went.

@@ -5,8 +5,11 @@ declare(strict_types=1);
 use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
 use Surface\Contracts\HumanInput\Key;
 use Surface\Contracts\HumanInput\Modifiers;
+use Surface\Contracts\Windows\Input\EditCommand;
 use Surface\Contracts\Windows\Mail\MenuActivated;
 use Surface\Contracts\Windows\Mail\View\ButtonClicked;
+use Surface\Contracts\Windows\Mail\View\EditCommanded;
+use Surface\Contracts\Windows\Mail\View\KeyPressed;
 use Surface\Contracts\Windows\Mail\WindowKeyPressed;
 use Surface\Contracts\Windows\Primitives\ButtonRole;
 
@@ -48,7 +51,8 @@ function windowKeys(): array
 
 it('posts a key no focused view took', function (): void {
     $main = keysWindow();
-    $main->view('m.map')->focus();
+    // No first responder: a focused canvas takes every key itself (CanvasKeysTest).
+    $main->native()->makeFirstResponder(null);
     press(F5_KEY, NSEventModifierFlags::FUNCTION->value);
     press(A_KEY);
 
@@ -87,14 +91,23 @@ it('moves focus on Tab and Shift-Tab and posts no key for them', function (): vo
     $main->close();
 });
 
-it('keeps Tab on a canvas that takes it, posting no key', function (): void {
+it('keeps Tab on a canvas that takes it, as the canvas\'s own key and no window key', function (): void {
     $main = keysWindow();
     $editor = $main->view('m.editor');
     $editor->focus();
+    pumpFor(0.05);
+    takeMail(session());
     press(TAB_KEY);
 
+    $mail = takeMail(session());
     expect($editor->hasFocus())->toBeTrue()
-        ->and(windowKeys())->toBe([]);
+        ->and(array_filter($mail, fn (object $mail): bool => $mail instanceof WindowKeyPressed))->toBe([])
+        ->and(array_values(array_filter($mail, fn (object $mail): bool => $mail instanceof KeyPressed)))->toEqual([
+            new KeyPressed('main', 'm.editor', $editor->uuid(), Key::TAB, '', new Modifiers(), false),
+        ])
+        ->and(array_values(array_filter($mail, fn (object $mail): bool => $mail instanceof EditCommanded)))->toEqual([
+            new EditCommanded('main', 'm.editor', $editor->uuid(), EditCommand::InsertTab),
+        ]);
     $main->close();
 });
 
@@ -111,7 +124,7 @@ it('gives a menu accelerator its item, not WindowKeyPressed', function (): void 
 
 it('posts an unhandled key equivalent with its modifier', function (): void {
     $main = keysWindow();
-    $main->view('m.map')->focus();
+    $main->native()->makeFirstResponder(null);
     press(J_KEY, NSEventModifierFlags::COMMAND->value);
 
     expect(windowKeys())->toEqual([new WindowKeyPressed('main', Key::J, 'j', new Modifiers(meta: true), false)]);
