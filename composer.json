@@ -1,7 +1,7 @@
 {
     "name": "jovian/venusian-appkit",
     "description": "AppKit toolkit driver for the Venusian Surface bridge: connects PHP to NSApplication, opens its windows and builds their menu bars through ext-appkit.",
-    "version": "0.10.5",
+    "version": "0.11.0",
     "type": "library",
     "keywords": [
         "framework",
@@ -12,7 +12,7 @@
         "macos"
     ],
     "license": "MIT",
-    "homepage": "https://venusian.projectsaturnstudios.com/ecosystem/jovian/venusian-appkit/0.10.x",
+    "homepage": "https://venusian.projectsaturnstudios.com/ecosystem/jovian/venusian-appkit/0.11.x",
     "support": {
         "issues": "https://github.com/jovian-packages/venusian-appkit/issues",
         "source": "https://github.com/jovian-packages/venusian-appkit"
@@ -24,24 +24,24 @@
         }
     ],
     "require": {
-        "php": "^8.4|^8.5|^8.6",
-        "ext-appkit": "^0.10.5",
-        "venusian-surface/bridge": "^0.10.1",
-        "venusian-surface/contracts": "^0.10.5",
-        "venusian-surface/human-input": "^0.10.1",
-        "venusian-surface/windows": "^0.10.5",
-        "venusian-voyager/nuts-and-bolts": "^0.10.1"
+        "php": "~8.4.27||^8.5.12",
+        "ext-appkit": "^0.11.0",
+        "venusian-surface/bridge": "^0.11.0",
+        "venusian-surface/contracts": "^0.11.0",
+        "venusian-surface/human-input": "^0.11.0",
+        "venusian-surface/windows": "^0.11.0",
+        "venusian-voyager/nuts-and-bolts": "^0.11.0"
     },
     "require-dev": {
-        "jovian/venusian-metal": "^0.10.0",
-        "jovian/venusian-opengl": "^0.10.0",
-        "jovian/venusian-sdl3": "^0.10.0",
-        "jovian/venusian-vulkan": "^0.10.0",
+        "jovian/venusian-metal": "^0.11.0",
+        "jovian/venusian-opengl": "^0.11.0",
+        "jovian/venusian-sdl3": "^0.11.0",
+        "jovian/venusian-vulkan": "^0.11.0",
         "pestphp/pest": "^4",
-        "venusian-surface/drawing": "^0.10.0",
-        "venusian-surface/fonts": "^0.10.0",
-        "venusian-voyager/config": "^0.10.1",
-        "venusian-voyager/vessel": "^0.10.1"
+        "venusian-surface/drawing": "^0.11.0",
+        "venusian-surface/fonts": "^0.11.0",
+        "venusian-voyager/config": "^0.11.0",
+        "venusian-voyager/vessel": "^0.11.0"
     },
     "suggest": {
         "ext-metal": "A canvas lends a CAMetalLayer to the 'metal' rendering engine (jovian/venusian-metal) when ext-metal is loaded.",
@@ -67,7 +67,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "0.10.x-dev"
+            "dev-main": "0.11.x-dev"
         },
         "venusian": {
             "providers": [

@@ -1,5 +1,9 @@
 # Log
 
+## 2026-10-28
+
+* **Version**: 0.11.0 with the Venusian 0.11 ecosystem: `dev-main` → `0.11.x-dev`, `version` 0.11.0, its extensions, `venusian-surface/*`, `venusian-voyager/*` and the jovian siblings at `^0.11.0`, PHP `~8.4.27||^8.5.12`, homepage `0.11.x`. No API change. 448 of 451 passed on Homebrew PHP 8.4 NTS and ZTS; the rest are focus- and timing-sensitive (Dialogs sheets, display-mode switches) and pass on rerun. macOS only.
+
 ## 2026-10-27
 
 * Services: alert styles (`NSAlertStyle`) and the suppression button (answered as `suppressed`); `supports()` gives `ShowHidden`, not `AlertTitle`; panel filters as `UTType`s from the patterns' extensions (a pattern with none throws) and hidden files; `AppkitClipboard` reads text, `hasText()`, and posts `ClipboardChanged` on its own `setText()` and when a window becomes key after the pasteboard's count moved. Needs ext-appkit's NSAlert style and suppression, NSSavePanel content types and hidden files, UTType and NSPasteboard change count. [windows and menus](architecture/windows-and-menus.md)
