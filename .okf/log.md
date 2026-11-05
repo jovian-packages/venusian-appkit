@@ -1,5 +1,9 @@
 # Log
 
+## 2026-11-04
+
+* Native text: `AppkitFonts` (`Primitives/Concerns`) holds FontSpec → NSFont (italic through `convertFont:toHaveTrait:`), trait conversion, the space advance and `metrics()`; the driver's `fontMetrics()` answers from it (ascender, −descender, line height = ascender − descender + leading, average width of a–z A–Z, fixed pitch). Text areas: every paragraph carries the area's style (alignment, default tab interval = columns × space advance, no explicit stops), background lines add their block to it, the text view's default paragraph style matches; bold/italic runs as converted fonts, underline and strikethrough as `NSUnderlineStyle::SINGLE`; a font change rebuilds paragraph styles and runs. Button and input alignment through NSControl. `nsAlignment()` moved into `AppkitPrimitive`.
+
 ## 2026-10-28
 
 * **Version**: 0.11.0 with the Venusian 0.11 ecosystem: `dev-main` → `0.11.x-dev`, `version` 0.11.0, its extensions, `venusian-surface/*`, `venusian-voyager/*` and the jovian siblings at `^0.11.0`, PHP `~8.4.27||^8.5.12`, homepage `0.11.x`. No API change. 448 of 451 passed on Homebrew PHP 8.4 NTS and ZTS; the rest are focus- and timing-sensitive (Dialogs sheets, display-mode switches) and pass on rerun. macOS only.

@@ -2,11 +2,11 @@
 
 namespace Jovian\Toolkits\Appkit\Primitives;
 
+use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitFonts;
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use NSAttributedString;
 use NSFont;
 use NSMutableParagraphStyle;
-use NSTextAlignment;
 use NSTextField;
 use NSURL;
 use Surface\Contracts\Windows\Primitives\Placement;
@@ -58,7 +58,7 @@ class AppkitLink extends TKLink
 
     protected function applyFont(FontSpec $font): void
     {
-        $this->native->setFont(self::nsFont($font));
+        $this->native->setFont(AppkitFonts::nsFont($font));
         $this->relink();
     }
 
@@ -83,19 +83,10 @@ class AppkitLink extends TKLink
         $paragraph->setAlignment(self::nsAlignment($this->alignment));
         $attributes = [
             NSLinkAttributeName => NSURL::URLWithString($this->url) ?? $this->url,
-            NSFontAttributeName => is_null($this->font) ? $this->built_font : self::nsFont($this->font),
+            NSFontAttributeName => is_null($this->font) ? $this->built_font : AppkitFonts::nsFont($this->font),
             NSParagraphStyleAttributeName => $paragraph,
         ];
 
         return NSAttributedString::initWithStringAttributes($this->text, $attributes);
-    }
-
-    protected static function nsAlignment(TextAlignment $alignment): NSTextAlignment
-    {
-        return match ($alignment) {
-            TextAlignment::LEFT => NSTextAlignment::LEFT,
-            TextAlignment::CENTER => NSTextAlignment::CENTER,
-            TextAlignment::RIGHT => NSTextAlignment::RIGHT,
-        };
     }
 }

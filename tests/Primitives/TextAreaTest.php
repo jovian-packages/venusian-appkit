@@ -28,7 +28,7 @@ it('paints line backgrounds as text blocks and ranges as colour attributes, and 
 
     expect(round($block->backgroundColor()->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->redComponent(), 2))->toBe(1.0)
         ->and($block->valueForDimension(NSTextBlockDimension::WIDTH))->toBe(100.0)
-        ->and($storage->attributeAtIndexEffectiveRange(NSParagraphStyleAttributeName, 0)[0])->toBeNull()
+        ->and($storage->attributeAtIndexEffectiveRange(NSParagraphStyleAttributeName, 0)[0]->textBlocks())->toBe([])
         ->and($area->native()->documentView()->layoutManager()->allowsNonContiguousLayout())->toBeTrue()
         ->and(round($storage->attributeAtIndexEffectiveRange(NSForegroundColorAttributeName, 12)[0]->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->blueComponent(), 2))->toBe(1.0)
         ->and(round($storage->attributeAtIndexEffectiveRange(NSBackgroundColorAttributeName, 13)[0]->colorUsingColorSpace(NSColorSpace::sRGBColorSpace())->greenComponent(), 2))->toBe(1.0)   // the 😀's first unit
@@ -41,7 +41,7 @@ it('paints line backgrounds as text blocks and ranges as colour attributes, and 
 
     $area->native()->documentView()->setSelectedRange(new NSRange(4, 0));   // the caret inside the styled line
     $area->setValue("x\ny");
-    expect($storage->attributeAtIndexEffectiveRange(NSParagraphStyleAttributeName, 0)[0])->toBeNull()
+    expect($storage->attributeAtIndexEffectiveRange(NSParagraphStyleAttributeName, 0)[0]->textBlocks())->toBe([])
         ->and($storage->attributeAtIndexEffectiveRange(NSBackgroundColorAttributeName, 2)[0])->toBeNull()
         ->and($area->native()->documentView()->string())->toBe("x\ny")
         ->and(viewMail(session()))->toBe([]);

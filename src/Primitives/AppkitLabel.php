@@ -2,11 +2,11 @@
 
 namespace Jovian\Toolkits\Appkit\Primitives;
 
+use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitFonts;
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use NSColor;
 use NSLayoutConstraintOrientation;
 use NSLineBreakMode;
-use NSTextAlignment;
 use NSTextField;
 use Surface\Contracts\Windows\Primitives\Placement;
 use Surface\Contracts\Windows\Styling\FontSpec;
@@ -67,16 +67,12 @@ class AppkitLabel extends TKLabel
 
     protected function applyAlignment(TextAlignment $alignment): void
     {
-        $this->native->setAlignment(match ($alignment) {
-            TextAlignment::LEFT => NSTextAlignment::LEFT,
-            TextAlignment::CENTER => NSTextAlignment::CENTER,
-            TextAlignment::RIGHT => NSTextAlignment::RIGHT,
-        });
+        $this->native->setAlignment(self::nsAlignment($alignment));
     }
 
     protected function applyFont(FontSpec $font): void
     {
-        $this->native->setFont(self::nsFont($font));
+        $this->native->setFont(AppkitFonts::nsFont($font));
     }
 
     protected function applyTextColor(?Color $color): void

@@ -3,6 +3,7 @@
 namespace Jovian\Toolkits\Appkit\Bridge;
 
 use Jovian\Toolkits\Appkit\Contracts\Bridge\AppkitBridgeDriver as BridgeContract;
+use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitFonts;
 use Jovian\Toolkits\Appkit\Services\AppkitClipboard;
 use Jovian\Toolkits\Appkit\Services\AppkitDesktop;
 use Jovian\Toolkits\Appkit\Services\AppkitDialogs;
@@ -14,6 +15,8 @@ use Surface\Bridge\ToolkitBridgeDriver;
 use Surface\Contracts\Windows\Display;
 use Surface\Contracts\Windows\Menus\MenuProfile as MenuProfileContract;
 use Surface\Contracts\Windows\StagedWindowDriver;
+use Surface\Contracts\Windows\Styling\FontMetrics;
+use Surface\Contracts\Windows\Styling\FontSpec;
 use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\Contracts\Windows\ToolkitWindowDriver;
 use Surface\Contracts\Windows\WindowException;
@@ -92,6 +95,11 @@ class AppkitBridgeDriver extends ToolkitBridgeDriver implements BridgeContract, 
     public function desktop(): AppkitDesktop
     {
         return $this->desktop ??= new AppkitDesktop();
+    }
+
+    public function fontMetrics(FontSpec $font): FontMetrics
+    {
+        return AppkitFonts::metrics($font);
     }
 
     public function has(string $name): bool

@@ -3,6 +3,7 @@
 namespace Jovian\Toolkits\Appkit\Primitives;
 
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitButtonImage;
+use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitFonts;
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use NSButton;
 use NSCellImagePosition;
@@ -13,6 +14,7 @@ use Surface\Contracts\Windows\Mail\View\ButtonClicked;
 use Surface\Contracts\Windows\Primitives\ButtonRole;
 use Surface\Contracts\Windows\Primitives\Placement;
 use Surface\Contracts\Windows\Styling\FontSpec;
+use Surface\Contracts\Windows\Styling\TextAlignment;
 use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\NutsAndBolts\Color;
 use Surface\Windows\Primitives\TKButton;
@@ -55,12 +57,17 @@ class AppkitButton extends TKButton
 
     protected function applyFont(FontSpec $font): void
     {
-        $this->native->setFont(self::nsFont($font));
+        $this->native->setFont(AppkitFonts::nsFont($font));
     }
 
     protected function applyTextColor(?Color $color): void
     {
         $this->native->setContentTintColor(is_null($color) ? null : self::nsColor($color));
+    }
+
+    protected function applyAlignment(TextAlignment $alignment): void
+    {
+        $this->native->setAlignment(self::nsAlignment($alignment));
     }
 
     /**

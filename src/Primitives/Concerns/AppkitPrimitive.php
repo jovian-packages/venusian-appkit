@@ -7,9 +7,8 @@ use Jovian\Toolkits\Appkit\Primitives\AppkitFixed;
 use Jovian\Toolkits\Appkit\Windows\AppkitContextMenu;
 use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
 use NSColor;
+use NSTextAlignment;
 use NSControl;
-use NSFont;
-use NSFontManager;
 use NSLayoutConstraint;
 use NSLayoutConstraintOrientation;
 use NSNotificationCenter;
@@ -23,8 +22,7 @@ use Surface\Contracts\Windows\Mail\View\ViewResized;
 use Surface\Contracts\Windows\Menus\ContextMenu as ContextMenuContract;
 use Surface\Contracts\Windows\Primitives\Align;
 use Surface\Contracts\Windows\Primitives\TKPrimitive;
-use Surface\Contracts\Windows\Styling\FontSpec;
-use Surface\Contracts\Windows\Styling\FontWeight;
+use Surface\Contracts\Windows\Styling\TextAlignment;
 use Surface\NutsAndBolts\Color;
 use Surface\Windows\Menus\ContextMenu;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
@@ -577,54 +575,12 @@ trait AppkitPrimitive
         return NSColor::colorWithRedGreenBlueAlpha($color->red, $color->green, $color->blue, $color->alpha);
     }
 
-    /**
-     * The system font (the monospaced system font when asked for) at the spec's size and
-     * weight, or the named family at that weight through NSFontManager; a family that is not
-     * installed falls back to the system font, as GTK's and Qt's font matching do.
-     *
-     * @param FontSpec $font
-     * @return NSFont
-     */
-    protected static function nsFont(FontSpec $font): NSFont
+    protected static function nsAlignment(TextAlignment $alignment): NSTextAlignment
     {
-        if (! is_null($font->family)) {
-            $named = NSFontManager::sharedFontManager()->fontWithFamilyTraitsWeightSize(
-                $font->family, 0, self::managerWeight($font->weight), $font->size,
-            );
-            if (! is_null($named)) {
-                return $named;
-            }
-        }
-
-        $weight = match ($font->weight) {
-            FontWeight::LIGHT => NSFont::WEIGHT_LIGHT,
-            FontWeight::REGULAR => NSFont::WEIGHT_REGULAR,
-            FontWeight::MEDIUM => NSFont::WEIGHT_MEDIUM,
-            FontWeight::SEMIBOLD => NSFont::WEIGHT_SEMIBOLD,
-            FontWeight::BOLD => NSFont::WEIGHT_BOLD,
-            FontWeight::BLACK => NSFont::WEIGHT_BLACK,
-        };
-
-        return $font->monospace
-            ? NSFont::monospacedSystemFontOfSizeWeight($font->size, $weight)
-            : NSFont::systemFontOfSizeWeight($font->size, $weight);
-    }
-
-    /**
-     * FontWeight on NSFontManager's 0–15 scale (5 regular, 9 bold).
-     *
-     * @param FontWeight $weight
-     * @return int
-     */
-    protected static function managerWeight(FontWeight $weight): int
-    {
-        return match ($weight) {
-            FontWeight::LIGHT => 3,
-            FontWeight::REGULAR => 5,
-            FontWeight::MEDIUM => 6,
-            FontWeight::SEMIBOLD => 8,
-            FontWeight::BOLD => 9,
-            FontWeight::BLACK => 11,
+        return match ($alignment) {
+            TextAlignment::LEFT => NSTextAlignment::LEFT,
+            TextAlignment::CENTER => NSTextAlignment::CENTER,
+            TextAlignment::RIGHT => NSTextAlignment::RIGHT,
         };
     }
 

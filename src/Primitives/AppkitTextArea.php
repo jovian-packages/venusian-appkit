@@ -2,12 +2,15 @@
 
 namespace Jovian\Toolkits\Appkit\Primitives;
 
+use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitFonts;
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use NSAttributedString;
 use NSClipView;
 use NSColor;
+use NSFont;
 use NSMutableParagraphStyle;
 use NSNotificationCenter;
+use NSNumber;
 use NSObject;
 use NSOperationQueue;
 use NSPoint;
@@ -19,12 +22,14 @@ use NSTextBlock;
 use NSTextBlockDimension;
 use NSTextBlockValueType;
 use NSTextView;
+use NSUnderlineStyle;
 use ObjCDelegate;
 use Surface\Contracts\Windows\Mail\View\TextChanged;
 use Surface\Contracts\Windows\Mail\View\ViewScrolled;
 use Surface\Contracts\Windows\Primitives\Placement;
 use Surface\Contracts\Windows\Styling\FontSpec;
 use Surface\Contracts\Windows\Styling\ScrollPosition;
+use Surface\Contracts\Windows\Styling\TextAlignment;
 use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\NutsAndBolts\Color;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
@@ -67,6 +72,8 @@ class AppkitTextArea extends TKTextArea
 
     protected readonly ?NSColor $built_color;
 
+    protected readonly NSFont $built_font;
+
     protected ?NSObject $width_observer = null;
 
     protected ?NSObject $scroll_observer = null;
@@ -92,8 +99,11 @@ class AppkitTextArea extends TKTextArea
         $this->text->layoutManager()->setAllowsNonContiguousLayout(true);
         $this->text->setString($this->value);
         $this->built_color = $this->text->textColor();
+        $this->built_font = $this->text->font() ?? NSFont::systemFontOfSizeWeight(13.0, NSFont::WEIGHT_REGULAR);
         $this->built_background = $this->text->backgroundColor();
         $this->built_draws_background = $this->text->drawsBackground();
+        // Text with no paragraph style lays out with AppKit's default stops (every 28 pt), not the area's tab width.
+        $this->applyLineBackgrounds([]);
 
         // The delegate holds its callable where PHP's collector cannot see it: a weak reference keeps it from holding the primitive.
         $self = WeakReference::create($this);
@@ -144,11 +154,11 @@ class AppkitTextArea extends TKTextArea
      */
     protected function applyValue(string $value): void
     {
-        $attributes = [NSForegroundColorAttributeName => $this->foreground()];
-        $font = $this->text->font();
-        if (! is_null($font)) {
-            $attributes[NSFontAttributeName] = $font;
-        }
+        $attributes = [
+            NSForegroundColorAttributeName => $this->foreground(),
+            NSFontAttributeName => $this->areaFont(),
+            NSParagraphStyleAttributeName => $this->paragraphStyle(),
+        ];
         $this->quietly(function () use ($value, $attributes): void {
             $this->text->textStorage()->setAttributedString(NSAttributedString::initWithStringAttributes($value, $attributes));
             $this->remeasure();
@@ -162,9 +172,25 @@ class AppkitTextArea extends TKTextArea
     protected function applyFont(FontSpec $font): void
     {
         $this->quietly(function () use ($font): void {
-            $this->text->setFont(self::nsFont($font));
+            $this->text->setFont(AppkitFonts::nsFont($font));
+            $this->applyLineBackgrounds($this->line_backgrounds);
+            $this->applyRangeStyles($this->range_styles);
             $this->remeasure();
         });
+    }
+
+    /** Tab stops follow the font's space advance: every paragraph style is rebuilt. */
+    protected function applyTabWidth(int $columns): void
+    {
+        $this->quietly(function (): void {
+            $this->applyLineBackgrounds($this->line_backgrounds);
+            $this->remeasure();
+        });
+    }
+
+    protected function applyAlignment(TextAlignment $alignment): void
+    {
+        $this->applyLineBackgrounds($this->line_backgrounds);
     }
 
     protected function applyBackground(?Color $color): void
@@ -246,12 +272,13 @@ class AppkitTextArea extends TKTextArea
         $storage = $this->text->textStorage();
         $lines = $this->lines();
         $storage->beginEditing();
-        $storage->removeAttributeRange(NSParagraphStyleAttributeName, new NSRange(0, $storage->length()));
+        $storage->addAttributeValueRange(NSParagraphStyleAttributeName, $this->paragraphStyle(), new NSRange(0, $storage->length()));
+        $this->text->setDefaultParagraphStyle($this->paragraphStyle());
         foreach ($backgrounds as $line => $color) {
             $block = NSTextBlock::init();
             $block->setBackgroundColor(self::nsColor($color));
             $block->setValueTypeForDimension(100.0, NSTextBlockValueType::PERCENTAGE_VALUE_TYPE, NSTextBlockDimension::WIDTH);
-            $style = NSMutableParagraphStyle::init();
+            $style = $this->paragraphStyle();
             $style->setTextBlocks([$block]);
             $start = $lines->utf16Start($line);
             $end = $line + 1 < $lines->count() ? $lines->utf16Start($line + 1) : $lines->utf16Total();
@@ -270,7 +297,12 @@ class AppkitTextArea extends TKTextArea
         $storage->beginEditing();
         $storage->removeAttributeRange(NSBackgroundColorAttributeName, $all);
         $storage->removeAttributeRange(self::RANGE_FOREGROUND, $all);
+        $storage->removeAttributeRange(NSUnderlineStyleAttributeName, $all);
+        $storage->removeAttributeRange(NSStrikethroughStyleAttributeName, $all);
         $storage->addAttributeValueRange(NSForegroundColorAttributeName, $this->foreground(), $all);
+        $font = $this->areaFont();
+        $storage->addAttributeValueRange(NSFontAttributeName, $font, $all);
+        $single = NSNumber::numberWithInteger(NSUnderlineStyle::SINGLE->value);
         foreach ($styles as $style) {
             $start = $lines->utf16Start($style->line) + $lines->utf16Column($style->line, $style->start);
             $length = $lines->utf16Column($style->line, $style->start + $style->length) - $lines->utf16Column($style->line, $style->start);
@@ -282,6 +314,16 @@ class AppkitTextArea extends TKTextArea
             }
             if (! is_null($style->background)) {
                 $storage->addAttributeValueRange(NSBackgroundColorAttributeName, self::nsColor($style->background), $range);
+            }
+            if ($style->bold || $style->italic) {
+                $run = $style->bold ? AppkitFonts::withTrait($font, NSBoldFontMask) : $font;
+                $storage->addAttributeValueRange(NSFontAttributeName, $style->italic ? AppkitFonts::withTrait($run, NSItalicFontMask) : $run, $range);
+            }
+            if ($style->underline) {
+                $storage->addAttributeValueRange(NSUnderlineStyleAttributeName, $single, $range);
+            }
+            if ($style->strikeout) {
+                $storage->addAttributeValueRange(NSStrikethroughStyleAttributeName, $single, $range);
             }
         }
         $this->quietly(fn () => $storage->endEditing());
@@ -408,6 +450,22 @@ class AppkitTextArea extends TKTextArea
         } finally {
             $this->quiet = $was;
         }
+    }
+
+    private function areaFont(): NSFont
+    {
+        return is_null($this->font) ? $this->built_font : AppkitFonts::nsFont($this->font);
+    }
+
+    /** A new style with the area's alignment and its tab width as default stops (no explicit ones). */
+    private function paragraphStyle(): NSMutableParagraphStyle
+    {
+        $style = NSMutableParagraphStyle::init();
+        $style->setAlignment(self::nsAlignment($this->alignment));
+        $style->setTabStops([]);
+        $style->setDefaultTabInterval($this->tab_width * AppkitFonts::spaceAdvance($this->areaFont()));
+
+        return $style;
     }
 
     private function foreground(): NSColor
