@@ -17,14 +17,16 @@ use ObjCFocusView;
 use Surface\Contracts\Windows\Primitives\Placement;
 use Surface\Contracts\Windows\ToolkitWindow;
 use Surface\Contracts\Windows\WindowException;
+use Surface\Contracts\Framebuffers\FormatSpec;
 use Surface\Windows\Primitives\TKCanvas;
 use Surface\Windows\Primitives\TKPrimitiveGroup;
 use WeakReference;
 
 /**
  * A layer-backed view whose layer contents are the canvas's pixels: each present() wraps the
- * framebuffer's RGBA8 bytes in a CGImage (sRGB, the fourth byte skipped, so opaque) and sets it
- * as the contents, stretched over the bounds. An ext-fb framebuffer never becomes a string:
+ * framebuffer's bytes in a CGImage described in pixelFormat() (sRGB, the alpha byte skipped, so
+ * opaque) and sets it as the contents, stretched over the bounds. The package binds BGRA8 as the
+ * native canvas format: Core Animation takes those bytes as they are, with no conversion a frame. An ext-fb framebuffer never becomes a string:
  * its memory is copied by address into the CFData the image reads. The view has no natural
  * size: the layout sizes it.
  *
@@ -119,9 +121,9 @@ class AppkitCanvas extends TKCanvas
     /**
      * @throws WindowException When Core Graphics refuses the image.
      */
-    protected function applyPixels(string $rgba8, int $width, int $height, array $damage): void
+    protected function applyPixels(string $pixels, int $width, int $height, array $damage): void
     {
-        $this->showData(CFData::create(null, $rgba8, strlen($rgba8)), $width, $height);
+        $this->showData(CFData::create(null, $pixels, strlen($pixels)), $width, $height);
     }
 
     protected function applyAddress(int $address, int $width, int $height, int $stride, array $damage): void
@@ -156,6 +158,17 @@ class AppkitCanvas extends TKCanvas
     }
 
     /**
+     * The CGBitmapInfo for opaque 32-bit pixels in $format: B G R X read as a little-endian word (the
+     * byte order Core Animation keeps), or R G B X as a big-endian one.
+     */
+    public static function bitmapInfo(FormatSpec $format): int
+    {
+        return $format->equals(FormatSpec::bgra8())
+            ? kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little
+            : kCGImageAlphaNoneSkipLast | kCGBitmapByteOrder32Big;
+    }
+
+    /**
      * The image over $data as the layer's contents.
      *
      * @throws WindowException When Core Foundation makes no data or Core Graphics refuses the image.
@@ -166,7 +179,7 @@ class AppkitCanvas extends TKCanvas
         $provider = is_null($data) ? null : CGDataProvider::createWithCFData($data);
         $image = is_null($provider) ? null : CGImage::create(
             $width, $height, 8, 32, $width * 4, self::$space,
-            kCGImageAlphaNoneSkipLast | kCGBitmapByteOrder32Big, $provider, null, true, kCGRenderingIntentDefault,
+            self::bitmapInfo($this->pixelFormat()), $provider, null, true, kCGRenderingIntentDefault,
         );
         if (is_null($image)) {
             throw new WindowException("Canvas '{$this->path()}' could not show a {$width}x{$height} image.");

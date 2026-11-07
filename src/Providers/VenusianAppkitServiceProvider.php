@@ -27,6 +27,9 @@ class VenusianAppkitServiceProvider extends ServiceProvider
     {
         $this->app->registerSingleton(DriverContract::class, fn (FrameworkCore $app) => $app->get('toolkit-bridge')->driver('appkit'));
         $this->app->alias('appkit-bridge', DriverContract::class);
+        // A canvas's native pixels: BGRA8, which Core Animation shows without converting. Surface uses it
+        // unless config framebuffers.canvas_format names a format.
+        $this->app->registerSingleton('framebuffers.native_canvas_format', fn (): string => 'bgra8');
     }
 
     /**
