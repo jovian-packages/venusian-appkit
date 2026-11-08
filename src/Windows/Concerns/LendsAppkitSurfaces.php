@@ -4,7 +4,7 @@ namespace Jovian\Toolkits\Appkit\Windows\Concerns;
 
 use CALayer;
 use CAMetalLayer;
-use CGSize;
+use NSSize;
 use NSLayoutConstraint;
 use NSOpenGLPixelFormat;
 use NSRect;
@@ -293,7 +293,7 @@ trait LendsAppkitSurfaces
         }
         // SDL sizes the drawable only when its window's pixel size changes; the host can change size inside an unchanged window.
         [$width, $height] = $this->pixelSize();
-        CAMetalLayer::fromPointer($this->sdl_view->layer()->pointer())->setDrawableSize(new CGSize((float) $width, (float) $height));
+        CAMetalLayer::fromPointer($this->sdl_view->layer()->pointer())->setDrawableSize(new NSSize((float) $width, (float) $height));
     }
 
     /**

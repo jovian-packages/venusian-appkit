@@ -366,3 +366,14 @@ it('lends a GL context over its view', function (): void {
     $window->reclaim();
     expect($window->glView())->toBeNull();
 })->skip(! function_exists('CGLGetCurrentContext'), 'needs ext-opengl');
+
+it('lets go of its delegate when it closes, so a late notification reaches nothing', function (): void {
+    $window = stage();
+    $native = $window->native();
+    expect($native->delegate())->not->toBeNull();
+
+    $window->close();
+    NSNotificationCenter::defaultCenter()->postNotificationNameObject('NSWindowDidChangeBackingPropertiesNotification', $native);
+
+    expect($native->delegate())->toBeNull();
+});

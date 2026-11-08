@@ -497,6 +497,8 @@ class AppkitWindow implements ToolkitWindow
         $this->removeContent();
         $this->content_constraints = [];
         $this->session->forgetLatest("window.resized.{$this->name}");
+        // The NSWindow can outlive this object: its delegate must not call into a window that is gone.
+        $this->window->setDelegate(null);
         $this->window = null;
         $this->key = false;
         $this->session->post(new WindowClosed($this->name));

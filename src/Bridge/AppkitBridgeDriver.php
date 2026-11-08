@@ -7,6 +7,7 @@ use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitFonts;
 use Jovian\Toolkits\Appkit\Services\AppkitClipboard;
 use Jovian\Toolkits\Appkit\Services\AppkitDesktop;
 use Jovian\Toolkits\Appkit\Services\AppkitDialogs;
+use Jovian\Toolkits\Appkit\Services\AppkitSystemAccent;
 use Jovian\Toolkits\Appkit\Windows\AppkitDisplays;
 use Jovian\Toolkits\Appkit\Windows\AppkitMenuBar;
 use Jovian\Toolkits\Appkit\Windows\AppkitStagedWindow;
@@ -60,6 +61,8 @@ class AppkitBridgeDriver extends ToolkitBridgeDriver implements BridgeContract, 
 
     protected ?AppkitDesktop $desktop = null;
 
+    protected ?AppkitSystemAccent $systemAccent = null;
+
     public function connect(): AppkitSession
     {
         $this->session ??= new AppkitSession();
@@ -95,6 +98,11 @@ class AppkitBridgeDriver extends ToolkitBridgeDriver implements BridgeContract, 
     public function desktop(): AppkitDesktop
     {
         return $this->desktop ??= new AppkitDesktop();
+    }
+
+    public function systemAccent(): AppkitSystemAccent
+    {
+        return $this->systemAccent ??= new AppkitSystemAccent();
     }
 
     public function fontMetrics(FontSpec $font): FontMetrics

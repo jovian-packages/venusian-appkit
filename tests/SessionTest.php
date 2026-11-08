@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Surface\Bridge\ToolkitPump;
+use Surface\Contracts\HumanInput\InputTap;
 use Voyager\IOPools\EventLoop;
 use Voyager\IOPools\LoopWaiter;
 use Voyager\IOPools\PromiseEngines\GuzzlePromiseEngine;
@@ -27,11 +28,23 @@ it('connects as a regular app and disconnects to prohibited', function (): void 
 it('waits at most the budget when nothing arrives', function (): void {
     session()->pump(0);
 
+    // Names whatever wakes the wait early, so a stray event from an earlier window shows in the failure.
+    $seen = [];
+    $tap = new class($seen) implements InputTap {
+        public function __construct(private array &$seen) {}
+
+        public function see(object $native_event): void
+        {
+            $this->seen[] = $native_event instanceof NSEvent ? $native_event->type()->name.' window '.$native_event->windowNumber() : $native_event::class;
+        }
+    };
+    session()->tap($tap);
     $t = hrtime(true);
     session()->pump(30_000_000);
     $ms = (hrtime(true) - $t) / 1e6;
+    session()->untap($tap);
 
-    expect($ms)->toBeGreaterThanOrEqual(25.0)->toBeLessThan(120.0);
+    expect($ms)->toBeGreaterThanOrEqual(25.0, sprintf('woken after %.1f ms by: %s', $ms, implode(', ', $seen) ?: 'nothing seen'))->toBeLessThan(120.0);
 });
 
 it('joins a loop: the loop waiter ends the toolkit sleep the moment a watched stream turns readable', function (): void {

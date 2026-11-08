@@ -13,6 +13,7 @@ use IOPMAssertion;
 use Jovian\Toolkits\Appkit\Bridge\AppkitBridgeDriver;
 use Jovian\Toolkits\Appkit\Bridge\AppkitSession;
 use Jovian\Toolkits\Appkit\Windows\Concerns\LendsAppkitSurfaces;
+use Jovian\Toolkits\Appkit\Windows\Concerns\ReadsStagedInput;
 use NSBackingStoreType;
 use NSColor;
 use NSGraphicsContext;
@@ -58,6 +59,7 @@ use Surface\Windows\StagedWindow;
 class AppkitStagedWindow extends StagedWindow
 {
     use LendsAppkitSurfaces;
+    use ReadsStagedInput;
 
     protected static ?CGColorSpace $space = null;
 
@@ -695,6 +697,9 @@ class AppkitStagedWindow extends StagedWindow
         $this->key = true;
         // A staged window has no bar of its own: the app's bar shows while it is key.
         $this->driver->installDefaultMenuBar();
+        if (! is_null($this->keys)) {
+            $this->window?->makeFirstResponder($this->keys);
+        }
         $this->focused();
     }
 
@@ -721,6 +726,8 @@ class AppkitStagedWindow extends StagedWindow
     {
         $this->teardown();
         $this->closed();
+        // The NSWindow can outlive this object: its delegate must not call into a window that is gone.
+        $this->window?->setDelegate(null);
         $this->window = null;
         $this->key = false;
     }
@@ -728,6 +735,7 @@ class AppkitStagedWindow extends StagedWindow
     /** What the window holds beyond itself: the captured display, the power assertion, the display link. */
     protected function teardown(): void
     {
+        $this->mute();
         $this->leaveExclusive();
         if (! is_null($this->assertion)) {
             $this->ioChecked(IOPMAssertion::release($this->assertion), 'IOPMAssertionRelease');

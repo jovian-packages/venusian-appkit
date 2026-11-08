@@ -114,3 +114,14 @@ it('posts WindowScaleChanged when the backing scale changes, and nothing for the
         ->and(array_values(array_filter(takeMail(session()), fn (object $mail): bool => $mail instanceof WindowScaleChanged)))->toEqual([new WindowScaleChanged('main', $window->native()->backingScaleFactor())]);
     $window->close();
 });
+
+it('lets go of its delegate when it closes, so a late notification reaches nothing', function (): void {
+    $window = driver()->open('main', 200, 100);
+    $native = $window->native();
+    expect($native->delegate())->not->toBeNull();
+
+    $window->close();
+    NSNotificationCenter::defaultCenter()->postNotificationNameObject('NSWindowDidChangeBackingPropertiesNotification', $native);
+
+    expect($native->delegate())->toBeNull();
+});

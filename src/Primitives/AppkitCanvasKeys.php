@@ -35,10 +35,10 @@ final class AppkitCanvasKeys
     private const int TAB = 48;
 
     /** NSEvent's device-independent modifier flags (the modifier keys as flags, Caps Lock and fn included). */
-    private const int DEVICE_INDEPENDENT = 0xFFFF0000;
+    public const int DEVICE_INDEPENDENT = 0xFFFF0000;
 
     /** Each modifier key's code (Carbon kVK_) to its NSEventModifierFlags bit. */
-    private const array MODIFIER_FLAGS = [
+    public const array MODIFIER_FLAGS = [
         56 => 1 << 17, 60 => 1 << 17, 59 => 1 << 18, 62 => 1 << 18, 58 => 1 << 19, 61 => 1 << 19,
         55 => 1 << 20, 54 => 1 << 20, 57 => 1 << 16, 63 => 1 << 23,
     ];
