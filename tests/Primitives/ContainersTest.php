@@ -390,3 +390,15 @@ it('removes a grid of spanning children without rebuilding it', function (): voi
         ->and($native->superview())->toBe($grid->placedView())
         ->and($grid->placedView()->superview())->toBeNull();
 });
+
+it('rounds a group\'s layer to its corner radius, and squares it at 0', function (): void {
+    $window = driver()->open('main', 300, 200);
+    $card = $window->column('m')->column('card');
+
+    $card->setBackground(Color::rgb(255, 0, 0))->setCornerRadius(8.0);
+
+    expect($card->native()->layer()->cornerRadius())->toEqualWithDelta(8.0, 0.0001);
+
+    $card->setCornerRadius(0.0);
+    expect($card->native()->layer()->cornerRadius())->toEqualWithDelta(0.0, 0.0001);
+});

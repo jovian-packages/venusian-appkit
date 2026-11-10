@@ -6,7 +6,12 @@ use Jovian\Toolkits\Appkit\Bridge\AppkitSession;
 use Jovian\Toolkits\Appkit\Primitives\AppkitFixed;
 use Jovian\Toolkits\Appkit\Windows\AppkitContextMenu;
 use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
+use Closure;
+use NSAnimationContext;
 use NSColor;
+use NSTimer;
+use ObjCTarget;
+use Surface\Contracts\Windows\Primitives\TKTransition;
 use NSTextAlignment;
 use NSControl;
 use NSLayoutConstraint;
@@ -52,6 +57,12 @@ trait AppkitPrimitive
      * @var NSView|null
      */
     protected ?NSView $slot = null;
+
+    /**
+     * The running transition's pending steps: each timer, and the target it calls.
+     * @var list<array{NSTimer, ObjCTarget}>
+     */
+    protected array $transition_timers = [];
 
     /**
      * ownView() inside the slot: its main-axis place and its natural size.
@@ -391,6 +402,92 @@ trait AppkitPrimitive
         $view = $this->ownView();
         $view->setWantsLayer(true);
         $view->layer()?->setBackgroundColor(is_null($color) ? null : self::nsColor($color)->CGColor());
+    }
+
+    /** The layer's cornerRadius rounds its backgroundColor; this leaves masksToBounds as AppKit has it. */
+    protected function applyCornerRadius(float $radius): void
+    {
+        $view = $this->ownView();
+        $view->setWantsLayer(true);
+        $view->layer()?->setCornerRadius($radius);
+    }
+
+    protected function applyOpacity(float $opacity): void
+    {
+        $view = $this->placedView();
+        $view->setWantsLayer(true);
+        $view->setAlphaValue($opacity);
+    }
+
+    /**
+     * An implicit-animation group moves the placed view between its laid-out frame and that frame
+     * offset by the transition, and its alpha between 0 and opacity(). No completion block is bound:
+     * a one-shot timer on the main run loop lands it after $seconds.
+     */
+    protected function applyTransition(TKTransition $transition, bool $entering, float $seconds, ?Closure $done): void
+    {
+        $this->stopTransition();
+
+        $view = $this->placedView();
+        $view->setWantsLayer(true);
+        $view->superview()?->layoutSubtreeIfNeeded();
+
+        $rest = $view->frame();
+        [$dx, $dy] = $transition->offset();
+        // Offsets are top-left based: down is +y in a flipped superview, -y in AppKit's own.
+        $down = ($view->superview()?->isFlipped() ?? false) ? 1.0 : -1.0;
+        $away = new NSRect($rest->x + $dx, $rest->y + $down * $dy, $rest->width, $rest->height);
+
+        $animate = function () use ($view, $entering, $seconds, $rest, $away): void {
+            NSAnimationContext::beginGrouping();
+            $context = NSAnimationContext::currentContext();
+            $context->setDuration($seconds);
+            $context->setAllowsImplicitAnimation(true);
+            $view->setAlphaValue($entering ? $this->opacity : 0.0);
+            $view->setFrame($entering ? $rest : $away);
+            NSAnimationContext::endGrouping();
+        };
+
+        // AppKit animates from what it last drew. A view just shown has drawn nothing: its away state
+        // goes out first, and the group starts one frame later, from that.
+        $lead = 0.0;
+        if ($entering) {
+            $view->setAlphaValue(0.0);
+            $view->setFrame($away);
+            $lead = 1 / 30;
+            $this->transitionAfter($lead, $animate);
+        } else {
+            $animate();
+        }
+
+        $this->transitionAfter($lead + $seconds, function () use ($entering, $view, $rest, $done): void {
+            $this->transition_timers = [];
+            if (! is_null($done)) {
+                $done();
+            }
+            if (! $entering) {
+                // Back where layout put it, at its opacity, for the next time it shows.
+                $view->setAlphaValue($this->opacity);
+                $view->setFrame($rest);
+            }
+        });
+    }
+
+    /** Run $step once, $seconds from now, on the main run loop, unless the transition stops first. */
+    protected function transitionAfter(float $seconds, Closure $step): void
+    {
+        $target = new ObjCTarget($step);
+        $timer = NSTimer::scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats($seconds, $target, ObjCTarget::ACTION, null, false);
+        $this->transition_timers[] = [$timer, $target];
+    }
+
+    /** A transition still running stops landing: the one that replaces it decides the end state. */
+    protected function stopTransition(): void
+    {
+        foreach ($this->transition_timers as [$timer]) {
+            $timer->invalidate();
+        }
+        $this->transition_timers = [];
     }
 
     /**

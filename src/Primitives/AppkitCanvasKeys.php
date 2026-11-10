@@ -44,12 +44,12 @@ final class AppkitCanvasKeys
     ];
 
     /** The Edit menu's actions; a focus view answers them while handled, so their items enable while the canvas is focused. */
-    private const array ACTIONS = ['cut:' => EditCommand::Cut, 'copy:' => EditCommand::Copy, 'paste:' => EditCommand::Paste, 'selectAll:' => EditCommand::SelectAll, 'undo:' => EditCommand::Undo, 'redo:' => EditCommand::Redo];
+    public const array ACTIONS = ['cut:' => EditCommand::Cut, 'copy:' => EditCommand::Copy, 'paste:' => EditCommand::Paste, 'selectAll:' => EditCommand::SelectAll, 'undo:' => EditCommand::Undo, 'redo:' => EditCommand::Redo];
 
     private const array SELECTORS = ['keyDown:', 'keyUp:', 'flagsChanged:', 'insertText:replacementRange:', 'doCommandBySelector:', 'cut:', 'copy:', 'paste:', 'selectAll:', 'undo:', 'redo:'];
 
     /** NSStandardKeyBindingResponding selectors to commands; a selector not here (noop:, transpose:, Home's scroll) posts nothing. */
-    private const array COMMANDS = [
+    public const array COMMANDS = [
         'moveLeft:' => EditCommand::MoveLeft, 'moveBackward:' => EditCommand::MoveLeft,
         'moveRight:' => EditCommand::MoveRight, 'moveForward:' => EditCommand::MoveRight,
         'moveUp:' => EditCommand::MoveUp, 'moveDown:' => EditCommand::MoveDown,

@@ -138,6 +138,25 @@ trait ReadsStagedInput
         return true;
     }
 
+    /** doCommandBySelector: of the focus view: a key binding's command; a selector not in the table posts nothing. */
+    public function commanded(string $selector): bool
+    {
+        $command = AppkitCanvasKeys::COMMANDS[$selector] ?? null;
+        if (! is_null($command)) {
+            $this->editCommanded($command);
+        }
+
+        return true;
+    }
+
+    /** An Edit menu action reached the focus view. */
+    public function acted(string $action): bool
+    {
+        $this->editCommanded(AppkitCanvasKeys::ACTIONS[$action]);
+
+        return true;
+    }
+
     private function listen(): void
     {
         if (! is_null($this->tap) || is_null($this->window)) {
@@ -156,6 +175,12 @@ trait ReadsStagedInput
         $this->keys->on('keyUp:', static fn (NSEvent $event): bool => $self->get()?->keyUp($event) ?? false);
         $this->keys->on('flagsChanged:', static fn (NSEvent $event): bool => $self->get()?->flagsChanged($event) ?? false);
         $this->keys->on('insertText:replacementRange:', static fn (string $text): bool => $self->get()?->inserted($text) ?? false);
+        // interpretKeyEvents: sends the key bindings' selectors here (arrows, delete, ...).
+        $this->keys->on('doCommandBySelector:', static fn (string $selector): bool => $self->get()?->commanded($selector) ?? false);
+        // The Edit menu's actions: answering them enables the items, and ⌘V reaches the window as paste:.
+        foreach (array_keys(AppkitCanvasKeys::ACTIONS) as $action) {
+            $this->keys->on($action, static fn (?NSObject $sender): bool => $self->get()?->acted($action) ?? false);
+        }
         // NSApplication sends no keyUp: to a window while Command is down; the monitor sees it first.
         $this->monitor = NSEvent::addLocalMonitorForEventsMatchingMaskHandler(
             NSEventMask::KEY_UP->value,
@@ -183,7 +208,7 @@ trait ReadsStagedInput
             $this->monitor = null;
         }
         if (! is_null($this->keys)) {
-            foreach (['acceptsFirstResponder', 'keyDown:', 'keyUp:', 'flagsChanged:', 'insertText:replacementRange:'] as $selector) {
+            foreach (['acceptsFirstResponder', 'keyDown:', 'keyUp:', 'flagsChanged:', 'insertText:replacementRange:', 'doCommandBySelector:', ...array_keys(AppkitCanvasKeys::ACTIONS)] as $selector) {
                 $this->keys->off($selector);
             }
             if ($this->window?->firstResponder() === $this->keys) {

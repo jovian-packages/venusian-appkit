@@ -13,6 +13,8 @@ use Surface\Contracts\Windows\Mail\Staged\StagedMoved;
 use Surface\Contracts\Windows\Mail\Staged\StagedPressed;
 use Surface\Contracts\Windows\Mail\Staged\StagedReleased;
 use Surface\Contracts\Windows\Mail\Staged\StagedTextCommitted;
+use Surface\Contracts\Windows\Mail\Staged\StagedEditCommanded;
+use Surface\Contracts\Windows\Input\EditCommand;
 
 /*
  * Opens a staged window on screen: a GUI run. Each event is made as the helpers in Pest.php make them
@@ -100,6 +102,22 @@ it('posts a key, the text it composes, and the key release', function (): void {
         new StagedKeyPressed('keys', Key::W, 'w', new Modifiers(), false),
         new StagedTextCommitted('keys', 'w'),
         new StagedKeyReleased('keys', Key::W, new Modifiers()),
+    ]);
+});
+
+it('posts a key binding and an Edit menu action as edit commands', function (): void {
+    $window = inputWindow()->watchInput();
+    takeMail(session());
+
+    // Left arrow: interpretKeyEvents: sends moveLeft: to doCommandBySelector:.
+    $window->keyDown(keyEvent($window, 123, true, "\u{F702}"));
+    // The Edit menu's paste: as the focus view hands it on.
+    $window->acted('paste:');
+
+    $edits = array_values(array_filter(stagedInputMail(), fn (object $mail): bool => $mail instanceof StagedEditCommanded));
+    expect($edits)->toEqual([
+        new StagedEditCommanded('keys', EditCommand::MoveLeft),
+        new StagedEditCommanded('keys', EditCommand::Paste),
     ]);
 });
 

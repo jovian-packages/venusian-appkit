@@ -60,6 +60,8 @@ class AppkitWindow implements ToolkitWindow
 
     protected AppkitRightClicks $right_clicks;
 
+    protected AppkitGroupClicks $group_clicks;
+
     protected AppkitCanvasClicks $canvas_clicks;
 
     protected AppkitCanvasPointer $canvas_pointer;
@@ -117,6 +119,7 @@ class AppkitWindow implements ToolkitWindow
         $this->backing_scale = $this->window->backingScaleFactor();
         $this->window->setDelegate($this->delegate);
         $this->right_clicks = new AppkitRightClicks($this, $session);
+        $this->group_clicks = new AppkitGroupClicks($this, $session);
         $this->canvas_clicks = new AppkitCanvasClicks($this, $session);
         // Tapped after the right clicks: a press their menu withheld arrives here already withheld.
         $this->canvas_pointer = new AppkitCanvasPointer($this, $session);
@@ -390,6 +393,12 @@ class AppkitWindow implements ToolkitWindow
         return $this->right_clicks;
     }
 
+    /** The window's clicks on clickable groups, posted as mail. */
+    public function groupClicks(): AppkitGroupClicks
+    {
+        return $this->group_clicks;
+    }
+
     /** The window's canvas clicks, posted as mail. */
     public function canvasClicks(): AppkitCanvasClicks
     {
@@ -488,6 +497,7 @@ class AppkitWindow implements ToolkitWindow
         }
 
         $this->right_clicks->detach();
+        $this->group_clicks->detach();
         $this->canvas_clicks->detach();
         $this->canvas_pointer->detach();
         $this->canvas_hover->detach();
