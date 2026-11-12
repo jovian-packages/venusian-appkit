@@ -134,6 +134,30 @@ it('scrolls one container that keeps its top in view and its width to the viewpo
         ->and(fn () => $scroll->row('second'))->toThrow(WindowException::class);
 });
 
+it('shows the top again when a scroll view hidden while its content grew is shown', function (): void {
+    $window = driver()->open('main', 200, 200);
+    $page = $window->column('m')->fill();
+    $scroll = $page->scrollView('s')->fill();
+    $lines = $scroll->column('lines');
+    $lines->label('first', 'first');
+    $window->present();
+    pumpFor(0.2);
+
+    // A tab not shown while its page gets a longer post, as APOD's Today does.
+    $page->setVisible(false);
+    pumpFor(0.1);
+    foreach (range(0, 29) as $i) {
+        $lines->label("l{$i}", "line {$i}");
+    }
+    pumpFor(0.1);
+    $page->setVisible(true);
+    pumpFor(0.2);
+
+    $document = $scroll->native()->documentView();
+    expect($document->frame()->height)->toBeGreaterThan(200.0)
+        ->and($document->visibleRect()->y + $document->visibleRect()->height)->toBe($document->frame()->height);
+});
+
 it('rebuilds the grid when a spanning child goes, so a later child takes only its own cell', function (): void {
     $window = driver()->open('main', 400, 300);
     $main = $window->column('m');

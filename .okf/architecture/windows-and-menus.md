@@ -5,7 +5,7 @@ description: NSWindow per name, delegate mail, one app-wide NSMenu bar, default 
 resource: src/Windows/
 tags: [appkit, windows, menus, macos]
 status: draft
-generated: { by: claude-opus/5.5, at: 2026-10-22T13:00:00Z }
+generated: { by: claude-opus/5.5, at: 2026-11-10T22:00:00Z }
 sources:
   - id: window
     resource: src/Windows/AppkitWindow.php
@@ -57,6 +57,8 @@ sources:
 [^driver]: AppkitBridgeDriver
 
 # Right clicks
+
+Behind a sheet (`AppkitWindow::hasSheet()`: `attachedSheet()` not null, so a child window, an alert or a file panel) AppKit drops the window's mouse events; the right-click, group-click and canvas-click taps then post nothing either, and the canvas pointer ends an owned press (`interrupt()`). Before this a click on the window behind a viewer sheet posted `GroupClicked`, and the app's second `open()` of the same child threw.
 
 `AppkitRightClicks` per window taps the session: `AppkitSession::pump()` shows each dequeued `NSEvent` to its taps before `sendEvent:`. `RIGHT_MOUSE_DOWN` (two-finger and Magic Mouse right clicks arrive as it), or `LEFT_MOUSE_DOWN` with `NSEventModifierFlags::CONTROL`, for this window's `windowNumber` → `contentView->hitTest:` (point in the frame view), walk `superview` to the first view a registry primitive owns (`native()` or `placedView()`) → `View\RightClicked`; the content view → `WindowRightClicked`; nil (title bar) → nothing; disabled primitive or group → nothing. Points top-left: `convertPoint:fromView:nil`, y turned round unless `isFlipped`. The tap holds the window weakly and no NSWindow, and untaps on close or when it finds its window gone: a tap that kept a closed NSWindow alive put events in the queue that ended a later pump early. A push button's bounds run 7 points past its bezel on every side, outside what its superview shows.
 

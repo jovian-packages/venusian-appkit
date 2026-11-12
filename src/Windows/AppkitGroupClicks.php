@@ -58,7 +58,7 @@ final class AppkitGroupClicks implements InputTap
 
             return;
         }
-        if (! $native_event instanceof NSEvent || $native_event->windowNumber() !== $window->native()->windowNumber()) {
+        if (! $native_event instanceof NSEvent || $native_event->windowNumber() !== $window->native()->windowNumber() || $window->hasSheet()) {
             return;
         }
         $type = $native_event->type();

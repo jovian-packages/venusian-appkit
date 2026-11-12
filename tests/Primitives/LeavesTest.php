@@ -142,6 +142,35 @@ it('shows an image at its natural size, scaled per mode, and refuses a file it c
     unlink($path);
 });
 
+it('gives a FIT image the height its width asks for at the image\'s aspect, as GtkPicture does', function (): void {
+    $path = pngFile(240, 20);
+    $window = driver()->open('main', 600, 400);
+    $scroll = $window->column('m')->scrollView('s');
+    $scroll->setScrollbars(false, true);
+    $scroll->fill();
+    // The column fills the scroll's width; the image fills the column's.
+    $image = $scroll->column('feed')->image('i', $path)->fill(true, false);
+    $window->present();
+    pumpFor(0.3);
+
+    [$width, $height] = $image->size();
+    // Within a point: AppKit lays frames out on the screen's pixel grid.
+    expect($width)->toBeGreaterThan(240)
+        ->and(abs($height - $width * 20 / 240))->toBeLessThanOrEqual(1.0);
+
+    $window->native()->setContentSize(new NSSize(400.0, 400.0));
+    pumpFor(0.3);
+    [$narrower, $shorter] = $image->size();
+    expect($narrower)->toBeLessThan($width)
+        ->and(abs($shorter - $narrower * 20 / 240))->toBeLessThanOrEqual(1.0);
+
+    // CENTER keeps the image's own height.
+    $image->setScaling(ImageScaling::CENTER);
+    pumpFor(0.3);
+    expect($image->size()[1])->toBe(20);
+    unlink($path);
+});
+
 it('draws horizontal and vertical separators as NSBox separators across their slot', function (): void {
     $window = driver()->open('main', 300, 200);
     $main = $window->column('m');
@@ -382,7 +411,9 @@ it('reports a picked day as DateChanged in PHP\'s time zone and shows the date s
         $native = $picker->native();
         $now = new DateTimeImmutable();
 
-        expect((new DateTimeZone($native->timeZone()->name()))->getOffset($now))->toBe($zone->getOffset($now))
+        // The calendar style: a month grid, far taller than the stepper field's one line.
+        expect($native->intrinsicContentSize()->height)->toBeGreaterThan(100.0)
+            ->and((new DateTimeZone($native->timeZone()->name()))->getOffset($now))->toBe($zone->getOffset($now))
             ->and((new DateTimeImmutable('@'.(int) $native->dateValue()->timeIntervalSince1970()))->setTimezone($zone)->format('Y-m-d'))->toBe('2026-03-14');
 
         $native->setDateValue(NSDate::dateWithTimeIntervalSince1970((float) (new DateTimeImmutable('2026-07-04 15:30', $zone))->getTimestamp()));

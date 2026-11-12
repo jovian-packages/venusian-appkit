@@ -30,6 +30,9 @@ use Surface\Contracts\Windows\Primitives\TKSlider;
 use Surface\Contracts\Windows\Primitives\TKSpinner;
 use Surface\Contracts\Windows\Primitives\TKSplitView;
 use Surface\Contracts\Windows\Primitives\TKTable;
+use Surface\Contracts\Windows\Primitives\TKSegmentedControl;
+use Surface\Contracts\Windows\Primitives\TKCollectionView;
+use Surface\Contracts\Windows\Primitives\TKListView;
 use Surface\Contracts\Windows\Primitives\TKTabView;
 use Surface\Contracts\Windows\Primitives\TKTextArea;
 use Surface\Contracts\Windows\Primitives\TKTextInput;
@@ -37,6 +40,8 @@ use Surface\Contracts\Windows\Primitives\TKTree;
 use Surface\Contracts\Windows\Primitives\TKToggle;
 use Surface\Contracts\Windows\Primitives\TKToggleButton;
 use Surface\Contracts\Windows\Primitives\TKVideo;
+use Surface\Contracts\Windows\Primitives\TKWebView;
+use Surface\Contracts\Windows\WindowException;
 
 /**
  * Mints the AppKit concretes for one window. Each mint takes the host's pending placement
@@ -149,6 +154,21 @@ class AppkitPrimitiveFactory implements PrimitiveFactory
         return new AppkitTable($name, $this->window, $host, $this->placement($host), $columns, $rows);
     }
 
+    public function mintSegmentedControl(TKPrimitiveGroup $host, string $name, array $segments, int $selected): TKSegmentedControl
+    {
+        return new AppkitSegmentedControl($name, $this->window, $host, $this->placement($host), $segments, $selected);
+    }
+
+    public function mintCollectionView(TKPrimitiveGroup $host, string $name, array $items): TKCollectionView
+    {
+        return new AppkitCollectionView($name, $this->window, $host, $this->placement($host), $items);
+    }
+
+    public function mintListView(TKPrimitiveGroup $host, string $name, array $items): TKListView
+    {
+        return new AppkitListView($name, $this->window, $host, $this->placement($host), $items);
+    }
+
     public function mintTree(TKPrimitiveGroup $host, string $name, array $columns, array $nodes): TKTree
     {
         return new AppkitTree($name, $this->window, $host, $this->placement($host), $columns, $nodes);
@@ -157,6 +177,18 @@ class AppkitPrimitiveFactory implements PrimitiveFactory
     public function mintVideo(TKPrimitiveGroup $host, string $name, ?string $file): TKVideo
     {
         return new AppkitVideo($name, $this->window, $host, $this->placement($host), $file);
+    }
+
+    /**
+     * @throws WindowException When the loaded ext-appkit has no WKWebView (a build from before its binding).
+     */
+    public function mintWebView(TKPrimitiveGroup $host, string $name): TKWebView
+    {
+        if (! class_exists('WKWebView')) {
+            throw new WindowException('TKWebView needs WKWebView, which this ext-appkit build does not have.');
+        }
+
+        return new AppkitWebView($name, $this->window, $host, $this->placement($host));
     }
 
     public function mintColumn(?TKPrimitiveGroup $host, string $name, int $spacing, int $padding): TKColumn

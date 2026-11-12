@@ -62,7 +62,7 @@ final class AppkitCanvasClicks implements InputTap
 
             return;
         }
-        if (! $native_event instanceof NSEvent || $native_event->windowNumber() !== $window->native()->windowNumber()) {
+        if (! $native_event instanceof NSEvent || $native_event->windowNumber() !== $window->native()->windowNumber() || $window->hasSheet()) {
             return;
         }
         $point = $native_event->locationInWindow();

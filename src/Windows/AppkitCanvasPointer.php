@@ -78,6 +78,12 @@ final class AppkitCanvasPointer implements InputTap
         if (! $native_event instanceof NSEvent || $native_event->windowNumber() !== $window->native()->windowNumber()) {
             return;
         }
+        // Behind a sheet AppKit sends the window nothing: a press it owned ends where it was.
+        if ($window->hasSheet()) {
+            $this->interrupt();
+
+            return;
+        }
         $this->seen($native_event, $native_event->locationInWindow());
     }
 

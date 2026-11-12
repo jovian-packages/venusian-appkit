@@ -20,7 +20,8 @@ use Surface\Windows\Primitives\TKPrimitiveGroup;
 use WeakReference;
 
 /**
- * A text-field-and-stepper NSDatePicker showing year, month and day in PHP's default time
+ * A graphical NSDatePicker: a month calendar to pick the day from, as GtkCalendar and Qt's popup
+ * calendar give, showing year, month and day in PHP's default time
  * zone, so the day the user sees is the day PHP reads: a date is midnight of its day in that
  * zone both ways. A null date shows today; date() stays null until a day is picked or set.
  */
@@ -44,7 +45,7 @@ class AppkitDatepicker extends TKDatepicker
         $this->target = new ObjCTarget(static fn () => $self->get()?->picked());
 
         $picker = $this->adoptNative(NSDatePicker::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
-        $picker->setDatePickerStyle(NSDatePickerStyle::TEXT_FIELD_AND_STEPPER);
+        $picker->setDatePickerStyle(NSDatePickerStyle::CLOCK_AND_CALENDAR);
         $picker->setDatePickerElements(NSDatePicker::ELEMENT_YEAR_MONTH_DAY);
         $picker->setDatePickerMode(NSDatePickerMode::SINGLE);
         $picker->setTimeZone(NSTimeZone::timeZoneWithName($this->zone->getName()));

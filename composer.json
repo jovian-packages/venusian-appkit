@@ -25,7 +25,8 @@
     ],
     "require": {
         "php": "~8.4.27||^8.5.12",
-        "ext-appkit": "^0.11.0",
+        "ext-appkit": "^0.11.2",
+        "ext-avkit": "^0.11.2",
         "venusian-surface/bridge": "^0.11.0",
         "venusian-surface/contracts": "^0.11.0",
         "venusian-surface/human-input": "^0.11.0",

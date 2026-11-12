@@ -4,8 +4,13 @@ namespace Jovian\Toolkits\Appkit\Primitives;
 
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use NSImage;
+use NSNotificationCenter;
+use NSOperationQueue;
 use NSRect;
+use NSTimer;
 use NSView;
+use ObjCTarget;
+use WeakReference;
 use Surface\Contracts\Windows\Primitives\ImageScaling;
 use Surface\Contracts\Windows\Primitives\Placement;
 use Surface\Contracts\Windows\ToolkitWindow;
@@ -25,6 +30,15 @@ class AppkitImage extends TKImage
 
     protected ?NSImage $image = null;
 
+    /** The width the view was last given: a FIT image's natural height follows it. 0 before the first. */
+    protected float $fit_width = 0.0;
+
+    /** Watches the view's frame for the width a FIT image's natural height follows. */
+    protected ?object $fit_observer = null;
+
+    /** The re-measure asked for after a width change, while it waits for the next run-loop turn. */
+    protected ?array $refit = null;
+
     /**
      * The file the view is showing; a refused setFile() leaves file() here.
      * @var string|null
@@ -41,7 +55,54 @@ class AppkitImage extends TKImage
         $view->setWantsLayer(true);
         $view->layer()?->setMasksToBounds(true);
         $view->layer()?->setContentsGravity(self::gravity($this->scaling));
+        $view->setPostsFrameChangedNotifications(true);
+        $this->fit_observer = NSNotificationCenter::defaultCenter()->addObserverForNameObjectQueueUsingBlock(
+            NSViewFrameDidChangeNotification,
+            $view,
+            NSOperationQueue::mainQueue(),
+            fn () => $this->widthChanged(),
+        );
         $this->load($file);
+    }
+
+    /**
+     * A FIT image's natural height follows the width it was given, at the image's aspect, as
+     * GtkPicture measures height for width: a wide slot no longer asks for the file's full height
+     * and shows the picture centred in a band of empty space. ext-appkit binds no anchor
+     * multiplier, so the height is measured again when the width changes; only the height moves,
+     * so the next frame change finds the same width and stops.
+     */
+    protected function widthChanged(): void
+    {
+        $width = $this->native->frame()->width;
+        if (abs($width - $this->fit_width) < 0.5) {
+            return;
+        }
+        $this->fit_width = $width;
+        if ($this->scaling !== ImageScaling::FIT || ! is_null($this->refit)) {
+            return;
+        }
+        // The frame changes inside a layout pass, and a constraint swapped there does not move the
+        // view: the re-measure runs on the next run-loop turn, as the collection view's reload does.
+        $self = WeakReference::create($this);
+        $target = new ObjCTarget(static function () use ($self): void {
+            $image = $self->get();
+            if (! is_null($image)) {
+                $image->refit = null;
+                $image->removed || $image->remeasure();
+            }
+        });
+        $this->refit = [NSTimer::scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(0.0, $target, ObjCTarget::ACTION, null, false), $target];
+    }
+
+    protected function releaseNative(): void
+    {
+        is_null($this->refit) || $this->refit[0]->invalidate();
+        $this->refit = null;
+        if (! is_null($this->fit_observer)) {
+            NSNotificationCenter::defaultCenter()->removeObserver($this->fit_observer);
+            $this->fit_observer = null;
+        }
     }
 
     /**
@@ -64,6 +125,7 @@ class AppkitImage extends TKImage
     {
         $this->native->setWantsLayer(true);
         $this->native->layer()?->setContentsGravity(self::gravity($scaling));
+        $this->remeasure();
     }
 
     protected function naturalLength(bool $horizontal): float
@@ -72,6 +134,9 @@ class AppkitImage extends TKImage
             return 0.0;
         }
         $size = $this->image->size();
+        if (! $horizontal && $this->scaling === ImageScaling::FIT && $this->fit_width > 0.0 && $size->width > 0.0) {
+            return $this->fit_width * $size->height / $size->width;
+        }
 
         return $horizontal ? $size->width : $size->height;
     }

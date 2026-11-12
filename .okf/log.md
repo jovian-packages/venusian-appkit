@@ -1,5 +1,22 @@
 # Log
 
+## 2026-11-11
+
+* Video through ext-avkit: `AVPlayer`, `AVPlayerItem`, `AVPlayerView` and `CMTime` moved from ext-appkit (0.11.2) to ext-avkit (^0.11.2), now required. `AppkitPlayer` calls the C-named `CMTimeMake()`, `CMTimeMakeWithSeconds()` and `CMTimeGetSeconds()` that replace `CMTime::make()`, `makeWithSeconds()` and `getSeconds()`. Full suite 499 passed on ZTS and NTS (the session budget test with `XDEBUG_MODE=off`).
+* [Staged windows](architecture/staged-windows.md): native video in a staged window (`WindowCapability::Video`, `AppkitStagedVideo`); the AVPlayer code of `AppkitVideo` moved to the shared trait `AppkitPlayer`. `tests/StagedVideoTest.php`: 8 passed; `tests/Primitives/VideoTest.php`: 7 passed.
+
+## 2026-11-10
+
+* [Primitives](architecture/primitives.md): web view (`AppkitWebView`, `TKWebView`) over `WKWebView`. `tests/Primitives/WebViewTest.php`: 2 passed.
+* [Primitives](architecture/primitives.md): list row status icons sit at the title line's trailing end, as GTK and Qt place them. `tests/Primitives/ItemViewsTest.php`: 5 passed.
+* [Primitives](architecture/primitives.md): collection cells show `CollectionItem::$icons` on discs over the top-right corner, left of the action button. `tests/Primitives/ItemViewsTest.php`: 4 passed.
+* [Primitives](architecture/primitives.md): date picker is the graphical calendar `NSDatePicker` (was text field and stepper), as GTK and Qt give a calendar. `tests/Primitives/LeavesTest.php`.
+* [Primitives](architecture/primitives.md): scroll view shown again after being hidden scrolls to the top (APOD Today opened from another tab showed the post's bottom). `tests/Primitives/ContainersTest.php`: 22 passed.
+* [Primitives](architecture/primitives.md): collection view: the next-turn relayout also lays out once at a cell a point taller, so an item given its own index back moves too (the APOD grid, shown after loading while hidden, kept one cell over the first). The update-reload added before named the wrong cause and is gone. `tests/Primitives/ItemViewsTest.php`: 3 passed; Stargazer checked 3 times.
+* [Primitives](architecture/primitives.md): a FIT image's natural height follows its width (`AppkitImage::widthChanged()`). `tests/Primitives/LeavesTest.php` (new case) and `FreedTest.php`: 49 passed.
+* [Windows and menus](architecture/windows-and-menus.md): mouse taps post nothing for a window behind its sheet (`AppkitWindow::hasSheet()`); the canvas pointer interrupts an owned press. `tests/GroupClickTest.php` (sheet case added); suite 484 passed, `SessionTest` budget timing failed once under full-suite load and passed 3/3 alone.
+* [Primitives](architecture/primitives.md): segmented control, collection view and list view (`AppkitSegmentedControl`, `AppkitCollectionView`, `AppkitListView`, scroll watching in `Concerns/AppkitItemScroll`). `tests/Primitives/ItemViewsTest.php` (3 passed, no window shown).
+
 ## 2026-11-04
 
 * Native text: `AppkitFonts` (`Primitives/Concerns`) holds FontSpec → NSFont (italic through `convertFont:toHaveTrait:`), trait conversion, the space advance and `metrics()`; the driver's `fontMetrics()` answers from it (ascender, −descender, line height = ascender − descender + leading, average width of a–z A–Z, fixed pitch). Text areas: every paragraph carries the area's style (alignment, default tab interval = columns × space advance, no explicit stops), background lines add their block to it, the text view's default paragraph style matches; bold/italic runs as converted fonts, underline and strikethrough as `NSUnderlineStyle::SINGLE`; a font change rebuilds paragraph styles and runs. Button and input alignment through NSControl. `nsAlignment()` moved into `AppkitPrimitive`.

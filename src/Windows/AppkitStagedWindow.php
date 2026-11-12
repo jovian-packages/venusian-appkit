@@ -2,6 +2,7 @@
 
 namespace Jovian\Toolkits\Appkit\Windows;
 
+use AVPlayerView;
 use CADisplayLink;
 use CFData;
 use CGColorSpace;
@@ -41,6 +42,7 @@ use Surface\Contracts\Windows\ScaleFilter;
 use Surface\Contracts\Windows\WindowCapability;
 use Surface\Contracts\Windows\WindowException;
 use Surface\Contracts\Windows\WindowMode;
+use Surface\Windows\StagedVideo;
 use Surface\Windows\StagedWindow;
 
 /**
@@ -55,6 +57,9 @@ use Surface\Windows\StagedWindow;
  * captures the display, switches its mode and covers it with the window at
  * the shielding level. A mode asked for while a full-screen transition runs,
  * or before the window is shown, waits and is applied after.
+ *
+ * Video: an AppkitStagedVideo, an AVPlayerView over the drawing view, when
+ * ext-appkit was built with AVKit.
  */
 class AppkitStagedWindow extends StagedWindow
 {
@@ -218,8 +223,16 @@ class AppkitStagedWindow extends StagedWindow
         if (self::hasDisplayLink()) {
             $capabilities[] = WindowCapability::FrameClock;
         }
+        if (class_exists(AVPlayerView::class)) {
+            $capabilities[] = WindowCapability::Video;
+        }
 
         return $capabilities;
+    }
+
+    protected function makeVideo(string $name, ?string $file): StagedVideo
+    {
+        return new AppkitStagedVideo($name, $this, $file);
     }
 
     protected function lendingView(): NSView
@@ -657,6 +670,9 @@ class AppkitStagedWindow extends StagedWindow
 
     protected function didResize(): void
     {
+        foreach ($this->videos() as $video) {
+            $video instanceof AppkitStagedVideo && $video->relayout();
+        }
         $this->resized(...$this->nativeSize());
         $this->keepAspect();
         $this->syncMode();

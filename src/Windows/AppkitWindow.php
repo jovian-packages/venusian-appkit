@@ -248,6 +248,15 @@ class AppkitWindow implements ToolkitWindow
     }
 
     /**
+     * Whether a sheet (a child window, an alert, a file panel) is attached: AppKit then drops the
+     * window's own mouse events, so the session's taps must post nothing for them either.
+     */
+    public function hasSheet(): bool
+    {
+        return ! is_null($this->native()->attachedSheet());
+    }
+
+    /**
      * Whether this window is key, and so whose bar the app shows.
      * @return bool
      */

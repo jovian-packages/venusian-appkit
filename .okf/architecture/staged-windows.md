@@ -5,7 +5,7 @@ description: AppkitStagedWindow on ObjCStageWindow and ObjCDrawView; partial pre
 resource: src/Windows/AppkitStagedWindow.php
 tags: [appkit, staged-windows, fullscreen, displays]
 status: draft
-generated: { by: claude-opus/5.5, at: 2026-10-08T12:00:00Z }
+generated: { by: claude-fable/5.2, at: 2026-11-11T14:48:28Z }
 sources:
   - id: window
     resource: src/Windows/AppkitStagedWindow.php
@@ -48,6 +48,16 @@ Position: content rect top-left in desktop coordinates; `setFrameOrigin:`. Limit
 # Lending
 
 `LendsAppkitSurfaces` (shared with `AppkitCanvas`): Metal layer as the view's layer, SDL window over the NSWindow with SDL's swapchain view pinned into the view, `NSOpenGLView` pinned over the view. The session pump sweeps parked SDL windows for both.[^lending]
+
+# Video
+
+`AppkitStagedWindow` lists `WindowCapability::Video` (when `AVPlayerView` exists) and makes `AppkitStagedVideo` (`Surface\Windows\NativeVideo`): an `AVPlayerView` with inline controls inside a plain clipping `NSView` (`masksToBounds`), added as the last subview of the drawing view at the first `place()`.
+
+* The clip view's frame is the visible part; the player keeps its whole box, offset inside it. Points from the top-left become the drawing view's (y up), so `didResize()` calls `relayout()` on each video.
+* Over every engine: AppKit composites it above the view's own layer (Velvet), a lent `CAMetalLayer` (Metal, Vulkan), the GL view and SDL's swapchain view. `applyFrame()` re-adds the clip view when a view added later (a surface lent after it) sits above.
+* Player: trait `Primitives\Concerns\AppkitPlayer`, shared with the toolkit `AppkitVideo`: one `AVPlayer`, KVO on `timeControlStatus` and the item's `status`, the end notification; posts `VideoPlaying` / `VideoPaused` / `VideoEnded` / `VideoFailed`.
+* `remove()` (and window close): player stopped, observers gone, clip view out of the window.
+* `tests/StagedVideoTest.php`: 8 passed.
 
 [^window]: AppkitStagedWindow
 [^displays]: AppkitDisplays

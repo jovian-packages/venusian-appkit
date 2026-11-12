@@ -75,3 +75,23 @@ it('posts nothing for a group that is not clickable, a Ctrl-click, or a release 
 
     expect(groupClickMail())->toBe([]);
 });
+
+it('posts nothing for a click on a window behind its sheet, and posts again once the sheet is gone', function (): void {
+    $window = driver()->open('main', 300, 200);
+    $card = $window->column('m')->column('card')->setClickable();
+    $title = $card->label('title', 'Stargazer');
+    $at = groupClickPoint($window, $title->native());
+    $sheet = driver()->open('sheet', 200, 100, null, $window);
+    $sheet->present();
+    pumpUntil(fn (): bool => $window->hasSheet(), 3.0);
+    takeMail(session());
+
+    clickAt($window, $at);
+    expect(groupClickMail())->toBe([]);
+
+    $sheet->close();
+    pumpUntil(fn (): bool => ! $window->hasSheet(), 3.0);
+    takeMail(session());
+    clickAt($window, $at);
+    expect(groupClickMail())->toHaveCount(1);
+});
