@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
-use Surface\Contracts\Windows\Mail\WindowCloseRequested;
 use Surface\Contracts\Windows\Mail\WindowClosed;
+use Surface\Contracts\Windows\Mail\WindowCloseRequested;
 use Surface\Contracts\Windows\Mail\WindowFocused;
 use Surface\Contracts\Windows\Mail\WindowScaleChanged;
 use Surface\Contracts\Windows\WindowException;
+use Windows\AppkitWindow;
 
 beforeEach(function (): void {
     driver()->closeAll();

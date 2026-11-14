@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Jovian\Toolkits\Appkit\Primitives\AppkitSplitView;
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
+use Windows\AppkitWindow;
 use Surface\Contracts\Windows\Mail\View\SplitMoved;
 use Surface\Contracts\Windows\Mail\View\TabSelected;
 

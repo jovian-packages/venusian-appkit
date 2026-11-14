@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
 use Surface\Contracts\HumanInput\Key;
 use Surface\Contracts\HumanInput\Modifiers;
 use Surface\Contracts\Windows\Input\EditCommand;
@@ -12,6 +11,7 @@ use Surface\Contracts\Windows\Mail\View\EditCommanded;
 use Surface\Contracts\Windows\Mail\View\KeyPressed;
 use Surface\Contracts\Windows\Mail\WindowKeyPressed;
 use Surface\Contracts\Windows\Primitives\ButtonRole;
+use Windows\AppkitWindow;
 
 const F5_KEY = 96;
 const F6_KEY = 97;

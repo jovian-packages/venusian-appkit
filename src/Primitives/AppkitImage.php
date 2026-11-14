@@ -11,12 +11,12 @@ use NSTimer;
 use NSView;
 use ObjCTarget;
 use WeakReference;
-use Surface\Contracts\Windows\Primitives\ImageScaling;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Contracts\Windows\WindowException;
-use Surface\Windows\Primitives\TKImage;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
+use Surface\Contracts\Toolkits\Primitives\ImageScaling;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Contracts\Toolkits\ToolkitRuntimeException;
+use Surface\Toolkits\Primitives\TKImage;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
 
 /**
  * A layer-backed view drawing the image as its layer contents, clipped to its bounds, with the
@@ -46,7 +46,7 @@ class AppkitImage extends TKImage
     protected ?string $shown = null;
 
     /**
-     * @throws WindowException When $file cannot be read as an image.
+     * @throws ToolkitRuntimeException When $file cannot be read as an image.
      */
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement, ?string $file)
     {
@@ -108,13 +108,13 @@ class AppkitImage extends TKImage
     /**
      * @param string|null $file
      * @return void
-     * @throws WindowException When $file cannot be read; the shown image and file() stay as they were.
+     * @throws ToolkitRuntimeException When $file cannot be read; the shown image and file() stay as they were.
      */
     protected function applyFile(?string $file): void
     {
         try {
             $this->load($file);
-        } catch (WindowException $refused) {
+        } catch (ToolkitRuntimeException $refused) {
             $this->file = $this->shown;
 
             throw $refused;
@@ -144,13 +144,13 @@ class AppkitImage extends TKImage
     /**
      * @param string|null $file
      * @return void
-     * @throws WindowException
+     * @throws ToolkitRuntimeException
      */
     protected function load(?string $file): void
     {
         $image = is_null($file) ? null : NSImage::initWithContentsOfFile($file);
         if (! is_null($file) && is_null($image)) {
-            throw new WindowException("Image file '{$file}' cannot be read.");
+            throw new ToolkitRuntimeException("Image file '{$file}' cannot be read.");
         }
 
         $this->image = $image;

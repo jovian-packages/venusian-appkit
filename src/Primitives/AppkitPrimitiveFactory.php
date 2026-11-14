@@ -3,45 +3,46 @@
 namespace Jovian\Toolkits\Appkit\Primitives;
 
 use DateTimeImmutable;
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\Primitives\PrimitiveFactory;
-use Surface\Contracts\Windows\Primitives\TKButton;
-use Surface\Contracts\Windows\Primitives\TKCanvas;
-use Surface\Contracts\Windows\Primitives\TKCheckbox;
-use Surface\Contracts\Windows\Primitives\TKColumn;
-use Surface\Contracts\Windows\Primitives\TKDatepicker;
-use Surface\Contracts\Windows\Menus\ContextMenu;
-use Surface\Contracts\Windows\Primitives\TKComboBox;
-use Surface\Contracts\Windows\Primitives\TKDropdown;
-use Surface\Contracts\Windows\Primitives\TKMenuButton;
-use Surface\Contracts\Windows\Primitives\TKFixed;
-use Surface\Contracts\Windows\Primitives\TKGrid;
-use Surface\Contracts\Windows\Primitives\TKImage;
-use Surface\Contracts\Windows\Primitives\TKLabel;
-use Surface\Contracts\Windows\Primitives\TKLink;
-use Surface\Contracts\Windows\Primitives\TKPrimitiveGroup;
-use Surface\Contracts\Windows\Primitives\TKProgressBar;
-use Surface\Contracts\Windows\Primitives\TKRow;
-use Surface\Contracts\Windows\Primitives\TKScrollView;
-use Surface\Contracts\Windows\Primitives\TKSeparator;
-use Surface\Contracts\Windows\Primitives\TKScrollBar;
-use Surface\Contracts\Windows\Primitives\TKSlider;
-use Surface\Contracts\Windows\Primitives\TKSpinner;
-use Surface\Contracts\Windows\Primitives\TKSplitView;
-use Surface\Contracts\Windows\Primitives\TKTable;
-use Surface\Contracts\Windows\Primitives\TKSegmentedControl;
-use Surface\Contracts\Windows\Primitives\TKCollectionView;
-use Surface\Contracts\Windows\Primitives\TKListView;
-use Surface\Contracts\Windows\Primitives\TKTabView;
-use Surface\Contracts\Windows\Primitives\TKTextArea;
-use Surface\Contracts\Windows\Primitives\TKTextInput;
-use Surface\Contracts\Windows\Primitives\TKTree;
-use Surface\Contracts\Windows\Primitives\TKToggle;
-use Surface\Contracts\Windows\Primitives\TKToggleButton;
-use Surface\Contracts\Windows\Primitives\TKVideo;
-use Surface\Contracts\Windows\Primitives\TKWebView;
-use Surface\Contracts\Windows\WindowException;
+use Jovian\Toolkits\Appkit\Windows\AppkitWebView;
+use Surface\Contracts\Toolkits\Menus\ContextMenu;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\Primitives\PrimitiveFactory;
+use Surface\Contracts\Toolkits\Primitives\TKButton;
+use Surface\Contracts\Toolkits\Primitives\TKCanvas;
+use Surface\Contracts\Toolkits\Primitives\TKCheckbox;
+use Surface\Contracts\Toolkits\Primitives\TKCollectionView;
+use Surface\Contracts\Toolkits\Primitives\TKColumn;
+use Surface\Contracts\Toolkits\Primitives\TKComboBox;
+use Surface\Contracts\Toolkits\Primitives\TKDatepicker;
+use Surface\Contracts\Toolkits\Primitives\TKDropdown;
+use Surface\Contracts\Toolkits\Primitives\TKFixed;
+use Surface\Contracts\Toolkits\Primitives\TKGrid;
+use Surface\Contracts\Toolkits\Primitives\TKImage;
+use Surface\Contracts\Toolkits\Primitives\TKLabel;
+use Surface\Contracts\Toolkits\Primitives\TKLink;
+use Surface\Contracts\Toolkits\Primitives\TKListView;
+use Surface\Contracts\Toolkits\Primitives\TKMenuButton;
+use Surface\Contracts\Toolkits\Primitives\TKPrimitiveGroup;
+use Surface\Contracts\Toolkits\Primitives\TKProgressBar;
+use Surface\Contracts\Toolkits\Primitives\TKRow;
+use Surface\Contracts\Toolkits\Primitives\TKScrollBar;
+use Surface\Contracts\Toolkits\Primitives\TKScrollView;
+use Surface\Contracts\Toolkits\Primitives\TKSegmentedControl;
+use Surface\Contracts\Toolkits\Primitives\TKSeparator;
+use Surface\Contracts\Toolkits\Primitives\TKSlider;
+use Surface\Contracts\Toolkits\Primitives\TKSpinner;
+use Surface\Contracts\Toolkits\Primitives\TKSplitView;
+use Surface\Contracts\Toolkits\Primitives\TKTable;
+use Surface\Contracts\Toolkits\Primitives\TKTabView;
+use Surface\Contracts\Toolkits\Primitives\TKTextArea;
+use Surface\Contracts\Toolkits\Primitives\TKTextInput;
+use Surface\Contracts\Toolkits\Primitives\TKToggle;
+use Surface\Contracts\Toolkits\Primitives\TKToggleButton;
+use Surface\Contracts\Toolkits\Primitives\TKTree;
+use Surface\Contracts\Toolkits\Primitives\TKVideo;
+use Surface\Contracts\Toolkits\Primitives\TKWebView;
+use Surface\Contracts\Toolkits\ToolkitRuntimeException;
+use Jovian\Toolkits\Appkit\AppkitWindow;
 
 /**
  * Mints the AppKit concretes for one window. Each mint takes the host's pending placement
@@ -180,12 +181,12 @@ class AppkitPrimitiveFactory implements PrimitiveFactory
     }
 
     /**
-     * @throws WindowException When the loaded ext-appkit has no WKWebView (a build from before its binding).
+     * @throws ToolkitRuntimeException When the loaded ext-appkit has no WKWebView (a build from before its binding).
      */
     public function mintWebView(TKPrimitiveGroup $host, string $name): TKWebView
     {
         if (! class_exists('WKWebView')) {
-            throw new WindowException('TKWebView needs WKWebView, which this ext-appkit build does not have.');
+            throw new ToolkitRuntimeException('TKWebView needs WKWebView, which this ext-appkit build does not have.');
         }
 
         return new AppkitWebView($name, $this->window, $host, $this->placement($host));

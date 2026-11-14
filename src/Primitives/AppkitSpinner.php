@@ -6,10 +6,10 @@ use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use NSProgressIndicator;
 use NSProgressIndicatorStyle;
 use NSRect;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
-use Surface\Windows\Primitives\TKSpinner;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Primitives\TKSpinner;
 
 /**
  * A spinning NSProgressIndicator, shown only while it animates, as GtkSpinner draws nothing when stopped.

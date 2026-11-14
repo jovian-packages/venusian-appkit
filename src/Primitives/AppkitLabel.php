@@ -8,13 +8,13 @@ use NSColor;
 use NSLayoutConstraintOrientation;
 use NSLineBreakMode;
 use NSTextField;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\Styling\FontSpec;
-use Surface\Contracts\Windows\Styling\TextAlignment;
-use Surface\Contracts\Windows\ToolkitWindow;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\Styling\FontSpec;
+use Surface\Contracts\Toolkits\Styling\TextAlignment;
+use Surface\Contracts\Toolkits\ToolkitWindow;
 use Surface\NutsAndBolts\Color;
-use Surface\Windows\Primitives\TKLabel;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Primitives\TKLabel;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
 
 /**
  * NSTextField::labelWithString. Wrapping lets the label break into lines at the width it is

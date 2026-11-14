@@ -5,9 +5,9 @@ namespace Jovian\Toolkits\Appkit\Primitives\Concerns;
 use NSFont;
 use NSFontManager;
 use NSString;
-use Surface\Contracts\Windows\Styling\FontMetrics;
-use Surface\Contracts\Windows\Styling\FontSpec;
-use Surface\Contracts\Windows\Styling\FontWeight;
+use Surface\Contracts\Toolkits\Styling\FontMetrics;
+use Surface\Contracts\Toolkits\Styling\FontSpec;
+use Surface\Contracts\Toolkits\Styling\FontWeight;
 
 /**
  * FontSpec as an NSFont, and what AppKit measures for it: shared by the primitives and the driver.

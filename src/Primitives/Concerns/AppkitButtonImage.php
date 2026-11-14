@@ -10,8 +10,8 @@ use NSCellImagePosition;
 use NSImage;
 use NSSize;
 use Surface\Contracts\Framebuffers\Framebuffer;
-use Surface\Contracts\Windows\Primitives\ImagePosition;
-use Surface\Contracts\Windows\WindowException;
+use Surface\Contracts\Toolkits\Primitives\ImagePosition;
+use Surface\Contracts\Toolkits\ToolkitRuntimeException;
 
 /**
  * A Framebuffer as the NSImage a button shows: its RGBA8 pixels, alpha last, sized in points.
@@ -20,7 +20,7 @@ trait AppkitButtonImage
 {
     private static ?CGColorSpace $image_space = null;
 
-    /** @throws WindowException When Core Graphics makes no image of the pixels. */
+    /** @throws ToolkitRuntimeException When Core Graphics makes no image of the pixels. */
     protected static function nsImage(Framebuffer $image, float $scale): NSImage
     {
         $width = $image->viewportWidth();
@@ -34,7 +34,7 @@ trait AppkitButtonImage
         );
 
         return NSImage::initWithCGImageSize(
-            $cg ?? throw new WindowException("A {$width}x{$height} button image could not be made."),
+            $cg ?? throw new ToolkitRuntimeException("A {$width}x{$height} button image could not be made."),
             new NSSize($width / $scale, $height / $scale),
         );
     }

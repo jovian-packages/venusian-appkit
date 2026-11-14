@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
+use Windows\AppkitWindow;
 use Surface\Contracts\Windows\Mail\MenuActivated;
 use Surface\Contracts\Windows\Mail\View\RightClicked;
 use Surface\Contracts\Windows\Mail\View\Toggled;
@@ -198,7 +198,7 @@ it('dispatches what it pumps, except an event a tap withholds', function (): voi
     $click();
     $dispatched = $clicked();
     $tap = new class(session()) implements Surface\Contracts\HumanInput\InputTap {
-        public function __construct(private readonly Jovian\Toolkits\Appkit\Bridge\AppkitSession $session) {}
+        public function __construct(private readonly \deprecated\Bridge\AppkitSession $session) {}
 
         public function see(object $native_event): void
         {
@@ -218,7 +218,7 @@ it('dispatches what it pumps, except an event a tap withholds', function (): voi
 });
 
 it('builds a context menu folder with enabled false disabled, and the items below it', function (): void {
-    $menu = new Jovian\Toolkits\Appkit\Windows\AppkitContextMenu(Surface\Windows\Menus\ContextMenu::parse([
+    $menu = new Windows\AppkitContextMenu(Surface\Windows\Menus\ContextMenu::parse([
         ['label' => 'Share', 'enabled' => false, 'items' => [['label' => 'Copy Link']]],
         ['label' => 'Download'],
     ]), 'main', session());

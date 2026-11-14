@@ -2,28 +2,28 @@
 
 namespace Jovian\Toolkits\Appkit\Services;
 
-use Closure;
-use InvalidArgumentException;
-use Jovian\Toolkits\Appkit\Bridge\AppkitBridgeDriver;
-use Jovian\Toolkits\Appkit\Bridge\AppkitSession;
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
-use NSAlert;
-use NSAlertStyle;
-use NSControlStateValue;
-use NSOpenPanel;
-use NSSavePanel;
 use NSURL;
-use NSWindow;
-use Surface\Contracts\Windows\Services\Alert;
-use Surface\Contracts\Windows\Services\AlertStyle;
-use Surface\Contracts\Windows\Services\DialogCapability;
-use Surface\Contracts\Windows\Services\OpenRequest;
-use Surface\Contracts\Windows\Services\SaveRequest;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Services\ToolkitDialogs;
 use UTType;
-use Voyager\Contracts\Signals\NamedSignal;
+use Closure;
+use NSAlert;
+use NSWindow;
+use NSSavePanel;
+use NSOpenPanel;
+use NSAlertStyle;
 use WeakReference;
+use NSControlStateValue;
+use Jovian\Toolkits\Appkit\AppkitWindow;
+use InvalidArgumentException;
+use Jovian\Toolkits\Appkit\AppkitSession;
+use Voyager\Contracts\Signals\NamedSignal;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Services\ToolkitDialogs;
+use Surface\Contracts\Toolkits\Services\Alert;
+use Surface\Contracts\Toolkits\Services\AlertStyle;
+use Surface\Contracts\Toolkits\Services\OpenRequest;
+use Surface\Contracts\Toolkits\Services\SaveRequest;
+use Surface\Contracts\Toolkits\Services\DialogCapability;
+use Jovian\Toolkits\Appkit\AppkitBridge as AppkitBridgeDriver;
 
 /**
  * Alerts and file panels as sheets on their parent. The completion block answers; the parent's

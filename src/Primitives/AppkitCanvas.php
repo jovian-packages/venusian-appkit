@@ -2,114 +2,104 @@
 
 namespace Jovian\Toolkits\Appkit\Primitives;
 
+use CADisplayLink;
 use CFData;
 use CGColorSpace;
 use CGDataProvider;
 use CGImage;
+use Closure;
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
-use Jovian\Toolkits\Appkit\Windows\Concerns\LendsAppkitSurfaces;
 use NSRect;
-use NSTrackingArea;
-use NSTrackingAreaOptions;
+use NSRunLoop;
 use NSView;
-use NSWindow;
-use ObjCFocusView;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Contracts\Windows\WindowException;
-use Surface\Contracts\Framebuffers\FormatSpec;
-use Surface\Windows\Primitives\TKCanvas;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
-use WeakReference;
+use ObjCTarget;
+use Surface\Contracts\Graphics\PacedStage;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitRuntimeException;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKCanvas;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
 
 /**
- * A layer-backed view whose layer contents are the canvas's pixels: each present() wraps the
- * framebuffer's bytes in a CGImage described in pixelFormat() (sRGB, the alpha byte skipped, so
- * opaque) and sets it as the contents, stretched over the bounds. The package binds BGRA8 as the
- * native canvas format: Core Animation takes those bytes as they are, with no conversion a frame. An ext-fb framebuffer never becomes a string:
- * its memory is copied by address into the CFData the image reads. The view has no natural
- * size: the layout sizes it.
+ * A layer-backed view whose layer contents are the pixels it was last given: each display() wraps
+ * the bytes in a CGImage (sRGB, the alpha byte skipped, so opaque) and sets it as the contents,
+ * stretched over the bounds. The view has no natural size: the layout sizes it.
  *
- * A GPU engine borrows the view's layer instead: a CAMetalLayer from ext-metal, set as the
- * layer of the view while lent (WindowOutput); reclaimed, the view gets a backing layer of its
- * own back and shows images again.
+ * It takes no keys or pointer events. It lends its view to an engine that draws on macOS itself.
  *
- * With ext-opengl loaded it lends a GL context: an NSOpenGLView (OpenGL 4.1 core, double
- * buffered, at the backing resolution) pinned over the view. present() marks it for display,
- * and its drawRect: copies the borrower's frame into framebuffer 0 and flushes, so a redraw
- * AppKit asks for on its own copies the last frame again.
+ * It is a paced stage: a display link on the view fires once a refresh of the display the view is
+ * on, and what was asked to be shown is shown then. With nothing asked the link is paused, so an
+ * idle canvas wakes nothing.
  */
-class AppkitCanvas extends TKCanvas
+class AppkitCanvas extends TKCanvas implements PacedStage
 {
     use AppkitPrimitive;
-    use LendsAppkitSurfaces;
 
     protected static ?CGColorSpace $space = null;
 
-    private const int TRACKING = NSTrackingAreaOptions::MOUSE_ENTERED_AND_EXITED->value | NSTrackingAreaOptions::MOUSE_MOVED->value
-        | NSTrackingAreaOptions::ACTIVE_IN_ACTIVE_APP->value | NSTrackingAreaOptions::IN_VISIBLE_RECT->value;
+    /** What to show at the next refresh; null: nothing asked. */
+    protected ?Closure $due = null;
 
-    protected NSTrackingArea $tracking;
+    /** Fires once a refresh while something is due: made the first time something is. */
+    protected ?CADisplayLink $link = null;
 
-    private AppkitCanvasKeys $keys;
+    /** The display link's target: it must outlive the link. */
+    protected ?ObjCTarget $ticker = null;
 
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement)
     {
         parent::__construct($name, $window, $parent, $placement);
-        $view = $this->adoptNative(ObjCFocusView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
+        $view = $this->adoptNative(NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
         $view->setWantsLayer(true);
         $view->layer()?->setMasksToBounds(true);
         $view->layer()?->setContentsGravity(kCAGravityResize);
-        // The view holds the handler, and this canvas the view: a weak reference breaks the cycle.
-        $self = WeakReference::create($this);
-        $view->on('acceptsFirstResponder', static fn (): bool => $self->get()?->acceptsFocus() ?? false);
-        // Keys, commands and committed text while the view is first responder.
-        $this->keys = new AppkitCanvasKeys($this, $view);
-        // Enters, exits and moves for AppkitCanvasHover, which posts them while the canvas watches the pointer.
-        $this->tracking = NSTrackingArea::initWithRectOptionsOwnerUserInfo(new NSRect(0.0, 0.0, 0.0, 0.0), self::TRACKING, $view, null);
-        $view->addTrackingArea($this->tracking);
     }
 
-    /** The canvas view's tracking area: AppkitCanvasHover knows its canvas by it. */
-    public function trackingArea(): NSTrackingArea
+    public function native(): NSView
     {
-        return $this->tracking;
+        return $this->native;
     }
 
-    protected function releaseNative(): void
+    /** Its view: an engine that draws on macOS itself puts what it draws with over it. */
+    public function nativeSurface(): ?object
     {
-        $this->keys->detach();
-        $this->native->removeTrackingArea($this->tracking);
+        return $this->native;
     }
 
-    /** The enabled state the user sees: this canvas's own, unless a container above it is disabled. */
-    private bool $native_enabled = true;
-
-    /** What the focus view answers AppKit's acceptsFirstResponder: focusable and enabled, as GTK and Qt give a disabled widget no focus. */
-    public function acceptsFocus(): bool
+    public function whenDue(Closure $show): void
     {
-        return $this->isFocusable() && $this->native_enabled;
-    }
+        $this->live();
+        $this->due = $show;
 
-    /** A disabled canvas lets go of focus; the window's applyEnabled runs this quietly. */
-    protected function applyNativeEnabled(bool $on): void
-    {
-        $this->native_enabled = $on;
-        $window = $this->host()->native();
-        if (! $on && $window->firstResponder() === $this->native) {
-            $window->makeFirstResponder(null);
+        if (is_null($this->link)) {
+            $this->ticker = new ObjCTarget(fn () => $this->refreshed());
+            $this->link = $this->native->displayLinkWithTargetSelector($this->ticker, 'action:');
+            // common modes: frames go on showing while a menu is open or the window is being resized
+            $this->link->addToRunLoopForMode(NSRunLoop::mainRunLoop(), NSRunLoopCommonModes);
         }
+        $this->link->setPaused(false);
     }
 
-    /** The focus view's own handler reads the flag; a canvas that stops taking focus while it has it lets go, quietly. */
-    protected function applyFocusable(bool $on, bool $takesTab): void
+    /** The display is due a frame: show what was asked, or with nothing asked stop being woken. */
+    protected function refreshed(): void
     {
-        $window = $this->host()->native();
-        if (! $on && $window->firstResponder() === $this->native) {
-            $this->host()->focusTracker()->quietly(static function () use ($window): void {
-                $window->makeFirstResponder(null);
-            });
+        if (is_null($this->due)) {
+            $this->link?->setPaused(true);
+
+            return;
         }
+
+        [$show, $this->due] = [$this->due, null];
+        $show();
+    }
+
+    public function remove(): void
+    {
+        $this->due = null;
+        $this->link?->invalidate();
+        [$this->link, $this->ticker] = [null, null];
+
+        parent::remove();
     }
 
     /** The window's backing scale: 2.0 on a Retina display. */
@@ -118,74 +108,20 @@ class AppkitCanvas extends TKCanvas
         return $this->host()->native()->backingScaleFactor();
     }
 
-    /**
-     * @throws WindowException When Core Graphics refuses the image.
-     */
-    protected function applyPixels(string $pixels, int $width, int $height, array $damage): void
-    {
-        $this->showData(CFData::create(null, $pixels, strlen($pixels)), $width, $height);
-    }
-
-    protected function applyAddress(int $address, int $width, int $height, int $stride, array $damage): void
-    {
-        $this->showData(CFData::create(null, $address, $stride * $height), $width, $height);
-    }
-
-    protected function lendingView(): NSView
-    {
-        return $this->native;
-    }
-
-    protected function lendingWindow(): NSWindow
-    {
-        return $this->host()->native();
-    }
-
-    /** A backing layer of the view's own again, set up as the constructor set the first. */
-    protected function restoreOwnLayer(): void
-    {
-        $this->native->setWantsLayer(true);
-        $this->native->layer()?->setMasksToBounds(true);
-        $this->native->layer()?->setContentsGravity(kCAGravityResize);
-    }
-
-    /** Parked SDL windows whose device has let go are destroyed first. */
-    public function present(): static
-    {
-        self::sweepSdlWindows();
-
-        return parent::present();
-    }
-
-    /**
-     * The CGBitmapInfo for opaque 32-bit pixels in $format: B G R X read as a little-endian word (the
-     * byte order Core Animation keeps), or R G B X as a big-endian one.
-     */
-    public static function bitmapInfo(FormatSpec $format): int
-    {
-        return $format->equals(FormatSpec::bgra8())
-            ? kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little
-            : kCGImageAlphaNoneSkipLast | kCGBitmapByteOrder32Big;
-    }
-
-    /**
-     * The image over $data as the layer's contents.
-     *
-     * @throws WindowException When Core Foundation makes no data or Core Graphics refuses the image.
-     */
-    private function showData(?CFData $data, int $width, int $height): void
+    /** @throws ToolkitRuntimeException When Core Foundation makes no data or Core Graphics refuses the image. */
+    protected function applyPixels(string $rgba8, int $width, int $height): void
     {
         self::$space ??= CGColorSpace::createWithName(kCGColorSpaceSRGB);
+        $data = CFData::create(null, $rgba8, strlen($rgba8));
         $provider = is_null($data) ? null : CGDataProvider::createWithCFData($data);
+        // R G B X read as a big-endian word: the bytes in the order they were given
         $image = is_null($provider) ? null : CGImage::create(
             $width, $height, 8, 32, $width * 4, self::$space,
-            self::bitmapInfo($this->pixelFormat()), $provider, null, true, kCGRenderingIntentDefault,
+            kCGImageAlphaNoneSkipLast | kCGBitmapByteOrder32Big, $provider, null, true, kCGRenderingIntentDefault,
         );
         if (is_null($image)) {
-            throw new WindowException("Canvas '{$this->path()}' could not show a {$width}x{$height} image.");
+            throw new ToolkitRuntimeException("Canvas '{$this->path()}' could not show a {$width}x{$height} image.");
         }
-
-        $this->native->setWantsLayer(true);
         $this->native->layer()?->setContents($image);
     }
 }

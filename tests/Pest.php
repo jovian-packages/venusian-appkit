@@ -2,13 +2,10 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Bridge\AppkitBridgeDriver;
-use Jovian\Toolkits\Appkit\Bridge\AppkitSession;
+use deprecated\Bridge\AppkitBridgeDriver;
+use deprecated\Bridge\AppkitSession;
 use Jovian\Toolkits\Appkit\Input\AppkitInputEngine;
 use Jovian\Toolkits\Appkit\Primitives\AppkitTextArea;
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
-use Jovian\Toolkits\Appkit\Windows\AppkitStagedWindow;
-use Surface\HumanInput\InputFrame;
 use Surface\Bridge\ToolkitManager;
 use Surface\Bridge\ToolkitPump;
 use Surface\Contracts\Drawing\LentSurface;
@@ -17,9 +14,12 @@ use Surface\Contracts\Framebuffers\FormatSpec;
 use Surface\Contracts\Framebuffers\Framebuffer;
 use Surface\Contracts\Windows\Mail\View\PrimitiveMail;
 use Surface\Framebuffers\Native\NativeDirtyFramebuffer;
+use Surface\HumanInput\InputFrame;
 use Surface\Windows\ToolkitWindowManager;
 use Voyager\Config\Repository;
 use Voyager\Vessel\ControlPanel;
+use Windows\AppkitStagedWindow;
+use Windows\AppkitWindow;
 
 if (! extension_loaded('appkit')) {
     throw new RuntimeException('venusian-appkit tests need ext-appkit loaded.');

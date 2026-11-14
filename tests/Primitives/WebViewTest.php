@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Primitives\AppkitWebView;
+use Jovian\Toolkits\Appkit\Windows\AppkitWebView;
 use Surface\Contracts\Windows\Mail\View\WebViewFailed;
 use Surface\Contracts\Windows\Mail\View\WebViewLoaded;
 

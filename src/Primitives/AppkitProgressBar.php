@@ -6,10 +6,10 @@ use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use NSProgressIndicator;
 use NSProgressIndicatorStyle;
 use NSRect;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
-use Surface\Windows\Primitives\TKProgressBar;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Primitives\TKProgressBar;
 
 /**
  * A bar NSProgressIndicator over 0..1; a null fraction is the indeterminate, animating bar.

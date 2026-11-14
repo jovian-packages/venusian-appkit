@@ -4,16 +4,16 @@ namespace Jovian\Toolkits\Appkit\Primitives;
 
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitButtonImage;
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
-use Jovian\Toolkits\Appkit\Windows\AppkitContextMenu;
+use Windows\AppkitContextMenu;
 use NSPopUpButton;
 use NSRect;
 use Surface\Contracts\Framebuffers\Framebuffer;
-use Surface\Contracts\Windows\Menus\ContextMenu as ContextMenuContract;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Menus\ContextMenu;
-use Surface\Windows\Primitives\TKMenuButton;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
+use Surface\Contracts\Toolkits\Menus\ContextMenu as ContextMenuContract;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Menus\ContextMenu;
+use Surface\Toolkits\Primitives\TKMenuButton;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
 
 /**
  * An NSPopUpButton pull-down: item 0 carries the label and the image (the button shows it, the

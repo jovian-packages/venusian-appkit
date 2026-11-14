@@ -9,12 +9,12 @@ use NSFont;
 use NSMutableParagraphStyle;
 use NSTextField;
 use NSURL;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\Styling\FontSpec;
-use Surface\Contracts\Windows\Styling\TextAlignment;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKLink;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\Styling\FontSpec;
+use Surface\Contracts\Toolkits\Styling\TextAlignment;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKLink;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
 
 /**
  * A link over a label whose attributed text carries NSLinkAttributeName: AppKit draws it as a link

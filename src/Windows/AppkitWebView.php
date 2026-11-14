@@ -1,6 +1,6 @@
 <?php
 
-namespace Jovian\Toolkits\Appkit\Primitives;
+namespace Jovian\Toolkits\Appkit\Windows;
 
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use NSError;
@@ -10,12 +10,12 @@ use NSURL;
 use NSURLRequest;
 use ObjCDelegate;
 use ObjCObserver;
-use Surface\Contracts\Windows\Mail\View\WebViewFailed;
-use Surface\Contracts\Windows\Mail\View\WebViewLoaded;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
-use Surface\Windows\Primitives\TKWebView;
+use Surface\Contracts\Toolkits\Mail\Views\WebViewFailed;
+use Surface\Contracts\Toolkits\Mail\Views\WebViewLoaded;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Primitives\TKWebView;
 use WeakReference;
 use WKWebView;
 use WKWebViewConfiguration;

@@ -6,11 +6,11 @@ use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use NSButton;
 use NSControlStateValue;
 use ObjCTarget;
-use Surface\Contracts\Windows\Mail\View\Toggled;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKCheckbox;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
+use Surface\Contracts\Toolkits\Mail\Views\Toggled;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKCheckbox;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
 use WeakReference;
 
 /**

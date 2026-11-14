@@ -10,12 +10,12 @@ use NSLayoutConstraint;
 use NSRange;
 use NSRect;
 use NSView;
-use Surface\Contracts\Windows\Primitives\Align;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\Primitives\TKPrimitive as Child;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKGrid;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
+use Surface\Contracts\Toolkits\Primitives\Align;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\Primitives\TKPrimitive as Child;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKGrid;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
 
 /**
  * An NSGridView (native()) inside a plain frame view (ownView()), grown row by row and column

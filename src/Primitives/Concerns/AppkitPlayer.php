@@ -13,10 +13,10 @@ use NSObject;
 use NSOperationQueue;
 use NSURL;
 use ObjCObserver;
-use Surface\Contracts\Windows\Mail\View\VideoEnded;
-use Surface\Contracts\Windows\Mail\View\VideoFailed;
-use Surface\Contracts\Windows\Mail\View\VideoPaused;
-use Surface\Contracts\Windows\Mail\View\VideoPlaying;
+use Surface\Contracts\Toolkits\Mail\Views\VideoEnded;
+use Surface\Contracts\Toolkits\Mail\Views\VideoFailed;
+use Surface\Contracts\Toolkits\Mail\Views\VideoPaused;
+use Surface\Contracts\Toolkits\Mail\Views\VideoPlaying;
 use WeakReference;
 
 use function CMTimeGetSeconds;

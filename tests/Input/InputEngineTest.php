@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Bridge\AppkitBridgeDriver;
+use deprecated\Bridge\AppkitBridgeDriver;
 use Jovian\Toolkits\Appkit\Input\AppkitInputEngine;
 use Surface\Contracts\HumanInput\HumanInputException;
 use Surface\Contracts\HumanInput\Key;
@@ -269,7 +269,7 @@ it('keeps edges until settled', function (): void {
 });
 
 /** The window point of ($x, $y) in $view, from its top left, once laid out. */
-function inputControlPoint(Jovian\Toolkits\Appkit\Windows\AppkitWindow $window, NSView $view, float $x, float $y): NSPoint
+function inputControlPoint(Windows\AppkitWindow $window, NSView $view, float $x, float $y): NSPoint
 {
     $window->present();
     pumpUntil(fn (): bool => $view->bounds()->width > 0.0, 3.0);

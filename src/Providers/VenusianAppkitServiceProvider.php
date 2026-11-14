@@ -3,16 +3,11 @@
 namespace Jovian\Toolkits\Appkit\Providers;
 
 use ReflectionException;
-use Surface\Bridge\ToolkitBridgeDriver;
-use Surface\Bridge\ToolkitManager;
-use Surface\HumanInput\HumanInputManager;
-use Surface\HumanInput\InputFrame;
+use Jovian\Toolkits\Appkit\AppkitBridge;
+use Jovian\Toolkits\Appkit\AppkitSession;
+use Surface\Toolkits\Toolkits;
 use Voyager\Contracts\Core\FrameworkCore;
 use Voyager\NutsAndBolts\ServiceProvider;
-use Jovian\Toolkits\Appkit\Bridge\AppkitBridgeDriver as Driver;
-use Jovian\Toolkits\Appkit\Contracts\Bridge\AppkitBridgeDriver as DriverContract;
-use Jovian\Toolkits\Appkit\Input\AppkitInputEngine;
-use Jovian\Toolkits\Appkit\Input\GameControllerPadSource;
 
 class VenusianAppkitServiceProvider extends ServiceProvider
 {
@@ -25,11 +20,12 @@ class VenusianAppkitServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->registerSingleton(DriverContract::class, fn (FrameworkCore $app) => $app->get('toolkit-bridge')->driver('appkit'));
-        $this->app->alias('appkit-bridge', DriverContract::class);
+        $this->app->registerSingleton(AppkitBridge::class, fn (FrameworkCore $app) => Toolkits::bridge('appkit'));
+        $this->app->alias('appkit-bridge', AppkitBridge::class);
+
         // A canvas's native pixels: BGRA8, which Core Animation shows without converting. Surface uses it
         // unless config framebuffers.canvas_format names a format.
-        $this->app->registerSingleton('framebuffers.native_canvas_format', fn (): string => 'bgra8');
+        //$this->app->registerSingleton('framebuffers.native_canvas_format', fn (): string => 'bgra8');
     }
 
     /**
@@ -42,11 +38,13 @@ class VenusianAppkitServiceProvider extends ServiceProvider
         if (device_os_family() === 'linux') {
             return;                                                   // no AppKit here: the toolkit stays unregistered
         }
-        $toolkits = $this->app->get('toolkit-bridge');
-        $toolkits->extend('appkit', fn ($app): Driver => new Driver($app));
-        if ($this->app->has('human-input')) {
-            self::input($this->app->get('human-input'), $toolkits);
-        }
+
+        $toolkits = $this->app->get('toolkit-bridge-manager');
+        $toolkits->extend('appkit', fn ($app): AppkitBridge => new AppkitBridge($app));
+
+        //if ($this->app->has('human-input')) {
+        //    self::input($this->app->get('human-input'), $toolkits);
+        //}
     }
 
     /**
@@ -55,7 +53,7 @@ class VenusianAppkitServiceProvider extends ServiceProvider
      * where macOS keeps pads from a process that cannot become active, only while no toolkit
      * session on $toolkits is connected.
      */
-    public static function input(HumanInputManager $input, ToolkitManager $toolkits): void
+    /*public static function input(HumanInputManager $input, ToolkitManager $toolkits): void
     {
         $input->extend('appkit', fn (InputFrame $frame): AppkitInputEngine => new AppkitInputEngine($frame, $toolkits->driver('appkit')));
         $input->extendPads('gamecontroller', fn (InputFrame $frame): GameControllerPadSource => new GameControllerPadSource(
@@ -65,5 +63,5 @@ class VenusianAppkitServiceProvider extends ServiceProvider
                 fn (mixed $driver): bool => $driver instanceof ToolkitBridgeDriver && $driver->session()?->connected() === true,
             ),
         ));
-    }
+    }*/
 }

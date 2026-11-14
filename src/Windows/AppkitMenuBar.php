@@ -2,22 +2,23 @@
 
 namespace Jovian\Toolkits\Appkit\Windows;
 
-use Jovian\Toolkits\Appkit\Bridge\AppkitSession;
+use Jovian\Toolkits\Appkit\AppkitSession;
 use NSControlStateValue;
-use NSMenu;
 use NSEventModifierFlags;
+use NSMenu;
 use NSMenuItem;
 use ObjCTarget;
-use Surface\Contracts\Windows\Mail\MenuActivated;
-use Surface\Contracts\Windows\Mail\MenuRadioChosen;
-use Surface\Contracts\Windows\Mail\MenuToggled;
-use Surface\Contracts\Windows\Mail\QuitRequested;
-use Surface\Contracts\Windows\Menus\MenuRole;
-use Surface\Contracts\Windows\WindowException;
-use Surface\Windows\Menus\Accelerator;
-use Surface\Windows\Menus\MenuItem;
-use Surface\Windows\Menus\MenuProfile;
-use Surface\Windows\Menus\MenuStates;
+use Surface\Contracts\Toolkits\Mail\Menus\MenuActivated;
+use Surface\Contracts\Toolkits\Mail\Menus\MenuRadioChosen;
+use Surface\Contracts\Toolkits\Mail\Menus\MenuToggled;
+use Surface\Contracts\Toolkits\Mail\QuitRequested;
+use Surface\Contracts\Toolkits\Menus\MenuRole;
+use Surface\Contracts\Toolkits\ToolkitRuntimeException;
+use Surface\Toolkits\Menus\Accelerator;
+use Surface\Toolkits\Menus\MenuItem;
+use Surface\Toolkits\Menus\MenuProfile;
+use Surface\Toolkits\Menus\MenuStates;
+
 /**
  * A menu profile built once into an NSMenu tree. macOS has one bar per app, so the window
  * that is key installs its own; the first folder is the app menu, which AppKit titles with
@@ -52,7 +53,7 @@ class AppkitMenuBar
 
     /**
      * Each radio group's item natives, by item id.
-     * @var array<string, array<string, NSMenuItem>>
+     * @var NSMenuItem
      */
     protected array $groups = [];
 
@@ -149,7 +150,7 @@ class AppkitMenuBar
 
     /**
      * Set the state of a node; the node and the nodes below it show their effective state. Posts nothing.
-     * @throws WindowException
+     * @throws ToolkitRuntimeException
      */
     public function setItemEnabled(string $item, bool $enabled): void
     {
@@ -159,7 +160,7 @@ class AppkitMenuBar
         }
     }
 
-    /** @throws WindowException */
+    /** @throws ToolkitRuntimeException */
     public function isItemEnabled(string $item): bool
     {
         return $this->states->isEnabled($item);
@@ -182,11 +183,11 @@ class AppkitMenuBar
 
     /**
      * One built node, item or folder, by its profile id.
-     * @throws WindowException
+     * @throws ToolkitRuntimeException
      */
     public function node(string $id): NSMenuItem
     {
-        return $this->nodes[$id] ?? throw new WindowException("No node '{$id}' in menu profile '{$this->profile->name}'.");
+        return $this->nodes[$id] ?? throw new ToolkitRuntimeException("No node '{$id}' in menu profile '{$this->profile->name}'.");
     }
 
     /**
@@ -224,20 +225,20 @@ class AppkitMenuBar
         $native->setState($on ? NSControlStateValue::ON : NSControlStateValue::OFF);
     }
 
-    /** @throws WindowException When no radio group has the name, or the item is not in it. */
+    /** @throws ToolkitRuntimeException When no radio group has the name, or the item is not in it. */
     public function setRadio(string $group, string $item): void
     {
         $this->states->setRadio($group, $item);
         $this->showRadio($group);
     }
 
-    /** @throws WindowException When no radio group has the name. */
+    /** @throws ToolkitRuntimeException When no radio group has the name. */
     public function radio(string $group): string
     {
         return $this->states->radio($group);
     }
 
-    /** A folder's slot and its submenu, or an item, show the label. @throws WindowException When no node has the id. */
+    /** A folder's slot and its submenu, or an item, show the label. @throws ToolkitRuntimeException When no node has the id. */
     public function setItemLabel(string $item, string $label): void
     {
         $this->states->setLabel($item, $label);
@@ -246,7 +247,7 @@ class AppkitMenuBar
         $native->submenu()?->setTitle($label);
     }
 
-    /** @throws WindowException When no node has the id. */
+    /** @throws ToolkitRuntimeException When no node has the id. */
     public function itemLabel(string $item): string
     {
         return $this->states->label($item);
@@ -281,16 +282,16 @@ class AppkitMenuBar
      * One built item, by its profile id.
      * @param string $id
      * @return NSMenuItem
-     * @throws WindowException
+     * @throws ToolkitRuntimeException
      */
     public function item(string $id): NSMenuItem
     {
-        return $this->items[$id] ?? throw new WindowException("No item '{$id}' in menu profile '{$this->profile->name}'.");
+        return $this->items[$id] ?? throw new ToolkitRuntimeException("No item '{$id}' in menu profile '{$this->profile->name}'.");
     }
 
     protected function toggle(string $item): NSMenuItem
     {
-        return $this->toggles[$item] ?? throw new WindowException("No toggle item '{$item}' in menu profile '{$this->profile->name}'.");
+        return $this->toggles[$item] ?? throw new ToolkitRuntimeException("No toggle item '{$item}' in menu profile '{$this->profile->name}'.");
     }
 
     protected function folder(MenuItem $folder): NSMenuItem

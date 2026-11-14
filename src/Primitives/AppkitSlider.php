@@ -5,11 +5,11 @@ namespace Jovian\Toolkits\Appkit\Primitives;
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use NSSlider;
 use ObjCTarget;
-use Surface\Contracts\Windows\Mail\View\ValueChanged;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
-use Surface\Windows\Primitives\TKSlider;
+use Surface\Contracts\Toolkits\Mail\Views\ValueChanged;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Primitives\TKSlider;
 use WeakReference;
 
 /**

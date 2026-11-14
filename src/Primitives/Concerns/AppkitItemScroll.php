@@ -8,8 +8,8 @@ use NSObject;
 use NSPoint;
 use NSScrollView;
 use NSView;
-use Surface\Contracts\Windows\Mail\View\ViewScrolled;
-use Surface\Contracts\Windows\Styling\ScrollPosition;
+use Surface\Contracts\Toolkits\Mail\Views\ViewScrolled;
+use Surface\Contracts\Toolkits\Styling\ScrollPosition;
 
 /**
  * An item view's scrolling: the clip view's bounds changes, observed synchronously, post

@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Windows\AppkitDisplays;
-use Jovian\Toolkits\Appkit\Windows\AppkitStagedWindow;
 use Surface\Contracts\Drawing\SurfaceKind;
 use Surface\Contracts\Drawing\VSync;
 use Surface\Contracts\Framebuffers\Region;
@@ -22,6 +20,8 @@ use Surface\Contracts\Windows\StagedWindowDriver;
 use Surface\Contracts\Windows\WindowCapability;
 use Surface\Contracts\Windows\WindowException;
 use Surface\Contracts\Windows\WindowMode;
+use Windows\AppkitDisplays;
+use Windows\AppkitStagedWindow;
 
 /*
  * Real AppKit windows through the shared driver. Mail is read from the

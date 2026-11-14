@@ -26,13 +26,13 @@ use NSTextField;
 use NSView;
 use ObjCDelegate;
 use ObjCTarget;
-use Surface\Contracts\Windows\Mail\View\ItemActionClicked;
-use Surface\Contracts\Windows\Mail\View\ItemActivated;
-use Surface\Contracts\Windows\Primitives\ListRow;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKListView;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
+use Surface\Contracts\Toolkits\Mail\Views\ItemActionClicked;
+use Surface\Contracts\Toolkits\Mail\Views\ItemActivated;
+use Surface\Contracts\Toolkits\Primitives\ListRow;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKListView;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
 use WeakReference;
 
 /**

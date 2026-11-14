@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Windows\AppkitStagedVideo;
-use Jovian\Toolkits\Appkit\Windows\AppkitStagedWindow;
 use Surface\Contracts\Windows\Mail\View\VideoEnded;
 use Surface\Contracts\Windows\Mail\View\VideoFailed;
 use Surface\Contracts\Windows\Mail\View\VideoPaused;
@@ -12,6 +10,8 @@ use Surface\Contracts\Windows\NativeVideo;
 use Surface\Contracts\Windows\VideoSource;
 use Surface\Contracts\Windows\WindowCapability;
 use Surface\Contracts\Windows\WindowException;
+use Windows\AppkitStagedVideo;
+use Windows\AppkitStagedWindow;
 
 /*
  * A staged window's native video on real AppKit: an AVPlayerView in a clipping view over the

@@ -10,13 +10,13 @@ use NSTabView;
 use NSTabViewItem;
 use NSView;
 use ObjCDelegate;
-use Surface\Contracts\Windows\Mail\View\TabSelected;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\Primitives\TKColumn;
-use Surface\Contracts\Windows\Primitives\TKPrimitive as Child;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
-use Surface\Windows\Primitives\TKTabView;
+use Surface\Contracts\Toolkits\Mail\Views\TabSelected;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\Primitives\TKColumn;
+use Surface\Contracts\Toolkits\Primitives\TKPrimitive as Child;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Primitives\TKTabView;
 use WeakReference;
 
 /**

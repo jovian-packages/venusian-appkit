@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
 use Surface\Contracts\Windows\Mail\View\CanvasDragged;
 use Surface\Contracts\Windows\Mail\View\CanvasEntered;
 use Surface\Contracts\Windows\Mail\View\CanvasLeft;
 use Surface\Contracts\Windows\Mail\View\CanvasMoved;
 use Surface\Contracts\Windows\Mail\View\CanvasPressed;
 use Surface\Contracts\Windows\Mail\View\CanvasReleased;
+use Windows\AppkitWindow;
 
 beforeEach(function (): void {
     driver()->closeAll();

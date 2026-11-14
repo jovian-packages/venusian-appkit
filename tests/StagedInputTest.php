@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Windows\AppkitStagedWindow;
+use Windows\AppkitStagedWindow;
 use Surface\Contracts\HumanInput\Key;
 use Surface\Contracts\HumanInput\Modifiers;
 use Surface\Contracts\HumanInput\MouseButton;

@@ -2,19 +2,21 @@
 
 namespace Jovian\Toolkits\Appkit\Windows;
 
-use Closure;
-use Jovian\Toolkits\Appkit\Bridge\AppkitSession;
-use NSEvent;
-use NSEventModifierFlags;
-use NSEventType;
 use NSView;
+use NSEvent;
+use Closure;
 use NSWindow;
-use Surface\Contracts\HumanInput\InputTap;
-use Surface\Contracts\Windows\Mail\View\FocusGained;
-use Surface\Contracts\Windows\Mail\View\FocusLost;
-use Surface\Contracts\Windows\Primitives\TKCanvas;
-use Surface\Contracts\Windows\Primitives\TKPrimitive;
+use NSEventType;
 use WeakReference;
+use NSEventModifierFlags;
+use Windows\AppkitCanvasClicks;
+use Jovian\Toolkits\Appkit\AppkitWindow;
+use Jovian\Toolkits\Appkit\AppkitSession;
+use Surface\Contracts\HumanInput\InputTap;
+use Surface\Contracts\Toolkits\Mail\Views\FocusLost;
+use Surface\Contracts\Toolkits\Primitives\TKCanvas;
+use Surface\Contracts\Toolkits\Mail\Views\FocusGained;
+use Surface\Contracts\Toolkits\Primitives\TKPrimitive;
 
 /**
  * A toolkit window's keyboard focus as primitives. After each event the session dispatches, the

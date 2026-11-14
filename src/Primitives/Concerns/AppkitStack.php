@@ -8,8 +8,8 @@ use NSLayoutConstraint;
 use NSStackView;
 use NSStackViewDistribution;
 use NSUserInterfaceLayoutOrientation;
-use Surface\Contracts\Windows\Primitives\Align;
-use Surface\Contracts\Windows\Primitives\TKPrimitive as Child;
+use Surface\Contracts\Toolkits\Primitives\Align;
+use Surface\Contracts\Toolkits\Primitives\TKPrimitive as Child;
 
 /**
  * Column and row over NSStackView. With no filling child, gravity-area distribution keeps every

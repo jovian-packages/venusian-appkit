@@ -8,17 +8,17 @@ use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use NSButton;
 use NSCellImagePosition;
 use Surface\Contracts\Framebuffers\Framebuffer;
-use Surface\Contracts\Windows\Primitives\ImagePosition;
+use Surface\Contracts\Toolkits\Primitives\ImagePosition;
 use ObjCTarget;
-use Surface\Contracts\Windows\Mail\View\ButtonClicked;
-use Surface\Contracts\Windows\Primitives\ButtonRole;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\Styling\FontSpec;
-use Surface\Contracts\Windows\Styling\TextAlignment;
-use Surface\Contracts\Windows\ToolkitWindow;
+use Surface\Contracts\Toolkits\Mail\Views\ButtonClicked;
+use Surface\Contracts\Toolkits\Primitives\ButtonRole;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\Styling\FontSpec;
+use Surface\Contracts\Toolkits\Styling\TextAlignment;
+use Surface\Contracts\Toolkits\ToolkitWindow;
 use Surface\NutsAndBolts\Color;
-use Surface\Windows\Primitives\TKButton;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Primitives\TKButton;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
 use WeakReference;
 
 /**

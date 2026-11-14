@@ -24,16 +24,16 @@ use NSTextBlockValueType;
 use NSTextView;
 use NSUnderlineStyle;
 use ObjCDelegate;
-use Surface\Contracts\Windows\Mail\View\TextChanged;
-use Surface\Contracts\Windows\Mail\View\ViewScrolled;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\Styling\FontSpec;
-use Surface\Contracts\Windows\Styling\ScrollPosition;
-use Surface\Contracts\Windows\Styling\TextAlignment;
-use Surface\Contracts\Windows\ToolkitWindow;
+use Surface\Contracts\Toolkits\Mail\Views\TextChanged;
+use Surface\Contracts\Toolkits\Mail\Views\ViewScrolled;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\Styling\FontSpec;
+use Surface\Contracts\Toolkits\Styling\ScrollPosition;
+use Surface\Contracts\Toolkits\Styling\TextAlignment;
+use Surface\Contracts\Toolkits\ToolkitWindow;
 use Surface\NutsAndBolts\Color;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
-use Surface\Windows\Primitives\TKTextArea;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Primitives\TKTextArea;
 use WeakReference;
 
 /**

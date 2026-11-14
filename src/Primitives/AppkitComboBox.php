@@ -11,13 +11,13 @@ use NSObject;
 use NSRect;
 use ObjCDelegate;
 use ObjCTarget;
-use Surface\Contracts\Windows\Mail\View\SelectionChanged;
-use Surface\Contracts\Windows\Mail\View\TextChanged;
-use Surface\Contracts\Windows\Mail\View\TextSubmitted;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKComboBox;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
+use Surface\Contracts\Toolkits\Mail\Views\SelectionChanged;
+use Surface\Contracts\Toolkits\Mail\Views\TextChanged;
+use Surface\Contracts\Toolkits\Mail\Views\TextSubmitted;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKComboBox;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
 use WeakReference;
 
 /**
@@ -84,7 +84,7 @@ class AppkitComboBox extends TKComboBox
             return false;
         }
         $taken = false;
-        $this->host()->focusTracker()->quietly(function () use ($window, &$taken): void {
+        $this->host()->quietly(function () use ($window, &$taken): void {
             $taken = $window->makeFirstResponder($this->native);
         });
 

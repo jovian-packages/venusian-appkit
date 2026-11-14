@@ -2,17 +2,11 @@
 
 namespace Jovian\Toolkits\Appkit\Primitives\Concerns;
 
-use Jovian\Toolkits\Appkit\Bridge\AppkitSession;
-use Jovian\Toolkits\Appkit\Primitives\AppkitFixed;
-use Jovian\Toolkits\Appkit\Windows\AppkitContextMenu;
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
 use Closure;
+use Jovian\Toolkits\Appkit\AppkitSession;
+use Jovian\Toolkits\Appkit\Primitives\AppkitFixed;
 use NSAnimationContext;
 use NSColor;
-use NSTimer;
-use ObjCTarget;
-use Surface\Contracts\Windows\Primitives\TKTransition;
-use NSTextAlignment;
 use NSControl;
 use NSLayoutConstraint;
 use NSLayoutConstraintOrientation;
@@ -22,15 +16,21 @@ use NSOperationQueue;
 use NSPoint;
 use NSRect;
 use NSStackView;
+use NSTextAlignment;
+use NSTimer;
 use NSView;
-use Surface\Contracts\Windows\Mail\View\ViewResized;
-use Surface\Contracts\Windows\Menus\ContextMenu as ContextMenuContract;
-use Surface\Contracts\Windows\Primitives\Align;
-use Surface\Contracts\Windows\Primitives\TKPrimitive;
-use Surface\Contracts\Windows\Styling\TextAlignment;
+use ObjCTarget;
+use Surface\Contracts\Toolkits\Mail\Views\ViewResized;
+use Surface\Contracts\Toolkits\Menus\ContextMenu as ContextMenuContract;
+use Surface\Contracts\Toolkits\Primitives\Align;
+use Surface\Contracts\Toolkits\Primitives\TKPrimitive;
+use Surface\Contracts\Toolkits\Primitives\TKTransition;
+use Surface\Contracts\Toolkits\Styling\TextAlignment;
 use Surface\NutsAndBolts\Color;
-use Surface\Windows\Menus\ContextMenu;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Menus\ContextMenu;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
+use Windows\AppkitContextMenu;
+use Jovian\Toolkits\Appkit\AppkitWindow;
 
 /**
  * The native side every AppKit primitive shares: the NSView it owns, the base apply* hooks,
@@ -312,7 +312,7 @@ trait AppkitPrimitive
      */
     protected function applyVisible(bool $visible): void
     {
-        $this->host()->focusTracker()->quietly(function () use ($visible): void {
+        $this->host()->quietly(function () use ($visible): void {
             $this->placedView()->setHidden(! $visible);
         });
         $this->replaceInAncestors();
@@ -332,7 +332,7 @@ trait AppkitPrimitive
             return false;
         }
         $taken = false;
-        $this->host()->focusTracker()->quietly(function () use ($window, $view, &$taken): void {
+        $this->host()->quietly(function () use ($window, $view, &$taken): void {
             $taken = $window->makeFirstResponder($view);
         });
 
@@ -341,7 +341,7 @@ trait AppkitPrimitive
 
     protected function nativeHasFocus(): bool
     {
-        return $this->host()->focusTracker()->holder() === $this;
+        return $this->host()->focused() === $this;
     }
 
     /** The menu popupMenu() has open, while AppKit tracks it; null otherwise. */
@@ -379,7 +379,7 @@ trait AppkitPrimitive
     /** A focused control that is disabled resigns first responder: code's move, so the focus tracker posts nothing. */
     protected function applyEnabled(bool $enabled): void
     {
-        $this->host()->focusTracker()->quietly(function (): void {
+        $this->host()->quietly(function (): void {
             $this->syncNativeEnabled();
         });
     }

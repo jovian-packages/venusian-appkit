@@ -2,10 +2,10 @@
 
 namespace Jovian\Toolkits\Appkit\Services;
 
-use Jovian\Toolkits\Appkit\Bridge\AppkitSession;
+use Jovian\Toolkits\Appkit\AppkitSession;
 use NSPasteboard;
-use Surface\Contracts\Windows\Mail\Services\ClipboardChanged;
-use Surface\Windows\Services\ToolkitClipboard;
+use Surface\Contracts\Toolkits\Mail\Services\ClipboardChanged;
+use Surface\Toolkits\Services\ToolkitClipboard;
 use Voyager\Contracts\Signals\NamedSignal;
 
 /**

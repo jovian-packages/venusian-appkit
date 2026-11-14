@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
+use Windows\AppkitWindow;
 use Surface\Contracts\HumanInput\Key;
 use Surface\Contracts\HumanInput\Modifiers;
 use Surface\Contracts\Windows\Input\EditCommand;

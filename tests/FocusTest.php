@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
 use Surface\Contracts\Windows\Mail\View\FocusGained;
 use Surface\Contracts\Windows\Mail\View\FocusLost;
 use Surface\Contracts\Windows\Primitives\TableColumn;
 use Surface\Contracts\Windows\Primitives\TreeNode;
 use Surface\Contracts\Windows\WindowException;
+use Windows\AppkitWindow;
 
 /** The A key: a key-down after a change, so the tracker compares after an event. */
 const A_LETTER = 0;

@@ -69,7 +69,7 @@ afterEach(function (): void {
     takeMail(session());
 });
 
-/** @return array{\Jovian\Toolkits\Appkit\Windows\AppkitWindow, \Jovian\Toolkits\Appkit\Primitives\AppkitCanvas} a shown window with a filling canvas */
+/** @return array{\Windows\AppkitWindow, \Jovian\Toolkits\Appkit\Primitives\AppkitCanvas} a shown window with a filling canvas */
 function appkitGlCanvas(int $width = 300, int $height = 200): array
 {
     $window = driver()->open('main', $width, $height);

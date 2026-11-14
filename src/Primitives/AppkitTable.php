@@ -11,13 +11,13 @@ use NSScrollView;
 use NSTableColumn;
 use NSTableView;
 use ObjCDelegate;
-use Surface\Contracts\Windows\Mail\View\RowSelected;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\Primitives\TableColumn;
-use Surface\Contracts\Windows\ToolkitWindow;
+use Surface\Contracts\Toolkits\Mail\Views\RowSelected;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\Primitives\TableColumn;
+use Surface\Contracts\Toolkits\ToolkitWindow;
 use Surface\NutsAndBolts\Color;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
-use Surface\Windows\Primitives\TKTable;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Primitives\TKTable;
 use WeakReference;
 
 /**

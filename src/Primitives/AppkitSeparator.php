@@ -7,10 +7,10 @@ use NSBox;
 use NSBoxType;
 use NSLayoutConstraint;
 use NSRect;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
-use Surface\Windows\Primitives\TKSeparator;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Primitives\TKSeparator;
 
 /**
  * An NSBox separator. AppKit reads a separator's direction from its frame, so it is built long

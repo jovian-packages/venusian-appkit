@@ -14,11 +14,11 @@ use NSRect;
 use NSScroller;
 use NSScrollerPart;
 use NSScrollerStyle;
-use Surface\Contracts\Windows\Mail\View\ScrollChanged;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
-use Surface\Windows\Primitives\TKScrollBar;
+use Surface\Contracts\Toolkits\Mail\Views\ScrollChanged;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Primitives\TKScrollBar;
 use ObjCTarget;
 use WeakReference;
 

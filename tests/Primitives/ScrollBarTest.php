@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use Jovian\Toolkits\Appkit\Primitives\AppkitScrollBar;
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
 use Surface\Contracts\Windows\Mail\View\ScrollChanged;
+use Windows\AppkitWindow;
 
 beforeEach(function (): void {
     driver()->closeAll();

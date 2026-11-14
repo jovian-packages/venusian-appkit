@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
 use Surface\Contracts\Windows\Mail\View\GroupClicked;
+use Windows\AppkitWindow;
 
 beforeEach(function (): void {
     driver()->closeAll();

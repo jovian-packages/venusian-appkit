@@ -8,14 +8,14 @@ use NSButton;
 use NSButtonType;
 use NSCellImagePosition;
 use Surface\Contracts\Framebuffers\Framebuffer;
-use Surface\Contracts\Windows\Primitives\ImagePosition;
+use Surface\Contracts\Toolkits\Primitives\ImagePosition;
 use NSControlStateValue;
 use ObjCTarget;
-use Surface\Contracts\Windows\Mail\View\Toggled;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
-use Surface\Windows\Primitives\TKToggleButton;
+use Surface\Contracts\Toolkits\Mail\Views\Toggled;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Primitives\TKToggleButton;
 use WeakReference;
 
 /**

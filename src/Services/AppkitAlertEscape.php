@@ -3,7 +3,7 @@
 namespace Jovian\Toolkits\Appkit\Services;
 
 use Closure;
-use Jovian\Toolkits\Appkit\Bridge\AppkitSession;
+use Jovian\Toolkits\Appkit\AppkitSession;
 use NSEvent;
 use NSEventType;
 use NSWindow;

@@ -7,10 +7,10 @@ use AVPlayerViewControlsStyle;
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPlayer;
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
 use NSRect;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
-use Surface\Windows\Primitives\TKVideo;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Primitives\TKVideo;
 
 /**
  * An AVPlayerView (inline controls) over one AVPlayer (AppkitPlayer plays it and posts its

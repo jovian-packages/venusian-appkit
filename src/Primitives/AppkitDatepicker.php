@@ -12,11 +12,11 @@ use NSDatePickerStyle;
 use NSRect;
 use NSTimeZone;
 use ObjCTarget;
-use Surface\Contracts\Windows\Mail\View\DateChanged;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\ToolkitWindow;
-use Surface\Windows\Primitives\TKDatepicker;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
+use Surface\Contracts\Toolkits\Mail\Views\DateChanged;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\ToolkitWindow;
+use Surface\Toolkits\Primitives\TKDatepicker;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
 use WeakReference;
 
 /**

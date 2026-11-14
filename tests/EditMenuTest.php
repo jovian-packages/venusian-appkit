@@ -9,7 +9,7 @@ beforeEach(function (): void {
 });
 
 /** The Edit item's index in its menu, to perform it as AppKit does. */
-function performEdit(Jovian\Toolkits\Appkit\Windows\AppkitWindow $window, string $id): void
+function performEdit(Windows\AppkitWindow $window, string $id): void
 {
     $item = $window->menuBar()->item($id);
     $item->menu()->performActionForItemAtIndex($item->menu()->indexOfItem($item));

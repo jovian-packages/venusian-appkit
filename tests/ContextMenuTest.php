@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Jovian\Toolkits\Appkit\Windows\AppkitWindow;
+use Windows\AppkitWindow;
 use Surface\Contracts\Windows\Mail\MenuActivated;
 use Surface\Contracts\Windows\Mail\MenuRadioChosen;
 use Surface\Contracts\Windows\Mail\MenuToggled;

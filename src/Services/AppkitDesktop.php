@@ -5,8 +5,8 @@ namespace Jovian\Toolkits\Appkit\Services;
 use InvalidArgumentException;
 use NSURL;
 use NSWorkspace;
-use Surface\Contracts\Windows\Services\Desktop;
-use Surface\Windows\Services\WebAddress;
+use Surface\Contracts\Toolkits\Services\Desktop;
+use Surface\Toolkits\Services\WebAddress;
 
 final class AppkitDesktop implements Desktop
 {

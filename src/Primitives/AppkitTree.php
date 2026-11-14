@@ -19,16 +19,16 @@ use NSTextField;
 use NSView;
 use ObjCDelegate;
 use ObjCTarget;
-use Surface\Contracts\Windows\Mail\View\NodeActivated;
-use Surface\Contracts\Windows\Mail\View\NodeExpanded;
-use Surface\Contracts\Windows\Mail\View\NodeSelected;
-use Surface\Contracts\Windows\Primitives\Placement;
-use Surface\Contracts\Windows\Primitives\TableColumn;
-use Surface\Contracts\Windows\Primitives\TreeNode;
-use Surface\Contracts\Windows\ToolkitWindow;
+use Surface\Contracts\Toolkits\Mail\Views\NodeActivated;
+use Surface\Contracts\Toolkits\Mail\Views\NodeExpanded;
+use Surface\Contracts\Toolkits\Mail\Views\NodeSelected;
+use Surface\Contracts\Toolkits\Primitives\Placement;
+use Surface\Contracts\Toolkits\Primitives\TableColumn;
+use Surface\Contracts\Toolkits\Primitives\TreeNode;
+use Surface\Contracts\Toolkits\ToolkitWindow;
 use Surface\NutsAndBolts\Color;
-use Surface\Windows\Primitives\TKPrimitiveGroup;
-use Surface\Windows\Primitives\TKTree;
+use Surface\Toolkits\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\Primitives\TKTree;
 use WeakReference;
 
 /**
