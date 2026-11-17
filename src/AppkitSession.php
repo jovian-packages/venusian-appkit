@@ -12,6 +12,7 @@ use ObjCDelegate;
 use NSApplication;
 use CFFileDescriptor;
 use CFRunLoopSource;
+use Closure;
 use NSApplicationActivationPolicy;
 use Surface\Toolkits\ToolkitSession;
 
@@ -42,6 +43,69 @@ class AppkitSession extends ToolkitSession
      * @var CFRunLoopSource|null
      */
     protected ?CFRunLoopSource $wake_source = null;
+
+    /**
+     * What keeps an event from AppKit, by owner: a filter that answers true for an event it handled.
+     * @var array<int, Closure(NSEvent): bool>
+     */
+    protected array $withholders = [];
+
+    /**
+     * What runs after each event the pump took, once AppKit has finished with it, by owner.
+     * @var array<int, Closure(): void>
+     */
+    protected array $after_dispatch = [];
+
+    /**
+     * Keep from AppKit each event $filter answers true for: the filter handled it, and the pump does
+     * not dispatch it. A local monitor cannot do this for every event (returning nil from one stops
+     * a key-up, not a key-down), so it is done where the pump takes events. Null lets go.
+     *
+     * @param (Closure(NSEvent): bool)|null $filter
+     */
+    public function withholdWhere(object $owner, ?Closure $filter): void
+    {
+        if (is_null($filter)) {
+            unset($this->withholders[spl_object_id($owner)]);
+
+            return;
+        }
+        $this->withholders[spl_object_id($owner)] = $filter;
+    }
+
+    /**
+     * Run $settle after each event the pump takes, dispatched or withheld, once AppKit has finished
+     * with it. Null lets go.
+     *
+     * @param (Closure(): void)|null $settle
+     */
+    public function afterDispatch(object $owner, ?Closure $settle): void
+    {
+        if (is_null($settle)) {
+            unset($this->after_dispatch[spl_object_id($owner)]);
+
+            return;
+        }
+        $this->after_dispatch[spl_object_id($owner)] = $settle;
+    }
+
+    /** Dispatch one event the pump took: unless a filter withheld it, AppKit gets it; then what runs after each event runs. */
+    protected function dispatch(NSEvent $event): void
+    {
+        $withheld = false;
+        foreach ($this->withholders as $filter) {
+            if ($filter($event)) {
+                $withheld = true;
+                break;
+            }
+        }
+        if (! $withheld) {
+            $this->application->sendEvent($event);
+        }
+        foreach ($this->after_dispatch as $settle) {
+            $settle();
+        }
+    }
 
 
 
@@ -119,7 +183,7 @@ class AppkitSession extends ToolkitSession
         $dispatched = 0;
 
         while ($event = $this->application->nextEventMatchingMaskUntilDateInModeDequeue(NSEventMask::ANY, $until, NSDefaultRunLoopMode, true)) {
-            $this->application->sendEvent($event);
+            $this->dispatch($event);
             $dispatched++;
             $until = NSDate::distantPast();
         }

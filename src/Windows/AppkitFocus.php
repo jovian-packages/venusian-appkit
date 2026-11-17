@@ -3,18 +3,12 @@
 namespace Jovian\Toolkits\Appkit\Windows;
 
 use NSView;
-use NSEvent;
 use Closure;
 use NSWindow;
-use NSEventType;
 use WeakReference;
-use NSEventModifierFlags;
-use Windows\AppkitCanvasClicks;
 use Jovian\Toolkits\Appkit\AppkitWindow;
 use Jovian\Toolkits\Appkit\AppkitSession;
-use Surface\Contracts\HumanInput\InputTap;
 use Surface\Contracts\Toolkits\Mail\Views\FocusLost;
-use Surface\Contracts\Toolkits\Primitives\TKCanvas;
 use Surface\Contracts\Toolkits\Mail\Views\FocusGained;
 use Surface\Contracts\Toolkits\Primitives\TKPrimitive;
 
@@ -27,11 +21,10 @@ use Surface\Contracts\Toolkits\Primitives\TKPrimitive;
  * A move made from code, inside quietly(), posts nothing and only sets the holder, so the next move
  * the user makes posts FocusLost for that holder, then FocusGained for the new one.
  *
- * A tap too: a left press on a focusable canvas makes the canvas first responder before AppKit
- * dispatches the press, as the press on its own view would. A view lent over the canvas (an
- * NSOpenGLView) takes no first responder, so AppKit alone would leave focus where it was.
+ * A canvas takes focus itself: its view accepts first responder once its input is open, so the
+ * click that AppKit hands it moves focus here like any other.
  */
-final class AppkitFocus implements InputTap
+final class AppkitFocus
 {
     /** @var WeakReference<AppkitWindow> the window holds this */
     private readonly WeakReference $window;
@@ -64,7 +57,6 @@ final class AppkitFocus implements InputTap
         $session->afterDispatch($this, static function () use ($self): void {
             $self->get()?->changed();
         });
-        $session->tap($this);
     }
 
     /** The primitive whose focus view holds focus; null for none, or for a view Surface did not make. */
@@ -131,26 +123,6 @@ final class AppkitFocus implements InputTap
         }
     }
 
-    public function see(object $native_event): void
-    {
-        $window = $this->window->get();
-        if (! $this->attached || ! $window instanceof AppkitWindow || ! $window->isOpen()) {
-            return;
-        }
-        if (! $native_event instanceof NSEvent
-            || $native_event->type() !== NSEventType::LEFT_MOUSE_DOWN
-            || $native_event->windowNumber() !== $this->native->windowNumber()
-            // Control-click is the right click: a context menu, no focus.
-            || ($native_event->modifierFlags() & NSEventModifierFlags::CONTROL->value) !== 0) {
-            return;
-        }
-        [$canvas] = AppkitCanvasClicks::canvasAt($window, $native_event->locationInWindow());
-        if ($canvas instanceof TKCanvas && $canvas->isFocusable() && method_exists($canvas, 'focusView')) {
-            // The user's move: the comparison after the press posts it.
-            $this->native->makeFirstResponder($canvas->focusView());
-        }
-    }
-
     /** The window closed: nothing posts after. */
     public function detach(): void
     {
@@ -159,7 +131,6 @@ final class AppkitFocus implements InputTap
         }
         $this->attached = false;
         $this->last = null;
-        $this->session->untap($this);
         $this->session->afterDispatch($this, null);
     }
 

@@ -8,12 +8,19 @@ use CGColorSpace;
 use CGDataProvider;
 use CGImage;
 use Closure;
+use Jovian\Toolkits\Appkit\Input\AppkitInputChannel;
+use Jovian\Toolkits\Appkit\Input\Seen;
+use Jovian\Toolkits\Appkit\Input\SeenKind;
 use Jovian\Toolkits\Appkit\Primitives\Concerns\AppkitPrimitive;
+use NSEvent;
 use NSRect;
 use NSRunLoop;
-use NSView;
+use ObjCFocusView;
 use ObjCTarget;
+use WeakReference;
+use Surface\Contracts\Graphics\HostFormatStage;
 use Surface\Contracts\Graphics\PacedStage;
+use Surface\Contracts\Rendering\Framebuffers\FormatSpec;
 use Surface\Contracts\Toolkits\Primitives\Placement;
 use Surface\Contracts\Toolkits\ToolkitRuntimeException;
 use Surface\Contracts\Toolkits\ToolkitWindow;
@@ -25,13 +32,17 @@ use Surface\Toolkits\Primitives\TKPrimitiveGroup;
  * the bytes in a CGImage (sRGB, the alpha byte skipped, so opaque) and sets it as the contents,
  * stretched over the bounds. The view has no natural size: the layout sizes it.
  *
- * It takes no keys or pointer events. It lends its view to an engine that draws on macOS itself.
+ * Once its input is open (input()), the view accepts first responder, so a click or focus() gives
+ * it the keyboard: it takes keyDown:, keyUp: and flagsChanged: for its input and hands key downs to
+ * interpretKeyEvents:, whose insertText: is the text typed and whose commands it swallows, so no
+ * key it takes beeps. Its pointer comes from the input backend. Before its input is open the view
+ * takes neither focus nor keys. It lends its view to an engine that draws on macOS itself.
  *
  * It is a paced stage: a display link on the view fires once a refresh of the display the view is
  * on, and what was asked to be shown is shown then. With nothing asked the link is paused, so an
  * idle canvas wakes nothing.
  */
-class AppkitCanvas extends TKCanvas implements PacedStage
+class AppkitCanvas extends TKCanvas implements PacedStage, HostFormatStage
 {
     use AppkitPrimitive;
 
@@ -49,13 +60,70 @@ class AppkitCanvas extends TKCanvas implements PacedStage
     public function __construct(string $name, ToolkitWindow $window, ?TKPrimitiveGroup $parent, Placement $placement)
     {
         parent::__construct($name, $window, $parent, $placement);
-        $view = $this->adoptNative(NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
+        $view = $this->adoptNative(ObjCFocusView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0)));
         $view->setWantsLayer(true);
         $view->layer()?->setMasksToBounds(true);
         $view->layer()?->setContentsGravity(kCAGravityResize);
+
+        // The view holds the handlers, and this canvas the view: a weak reference breaks the cycle.
+        $self = WeakReference::create($this);
+        $view->on('acceptsFirstResponder', static fn (): bool => ! is_null($self->get()?->keyboardInput()));
+        $view->on('keyDown:', static fn (NSEvent $event): bool => $self->get()?->keyed($event, true) ?? false);
+        $view->on('keyUp:', static fn (NSEvent $event): bool => $self->get()?->keyed($event, false) ?? false);
+        $view->on('flagsChanged:', static fn (NSEvent $event): bool => $self->get()?->flagged($event) ?? false);
+        $view->on('insertText:replacementRange:', static fn (string $text): bool => $self->get()?->typed($text) ?? false);
+        // a command a key asks for (an arrow's moveLeft:, Return's insertNewline:) is the key, already read
+        $view->on('doCommandBySelector:', static fn (string $selector): bool => ! is_null($self->get()?->keyboardInput()));
     }
 
-    public function native(): NSView
+    /** The input that takes this canvas's keys: open, and from the appkit backend. */
+    public function keyboardInput(): ?AppkitInputChannel
+    {
+        $input = $this->openInput();
+
+        return $input instanceof AppkitInputChannel ? $input : null;
+    }
+
+    /** @internal keyDown: and keyUp: while first responder */
+    public function keyed(NSEvent $event, bool $down): bool
+    {
+        $input = $this->keyboardInput();
+        if (is_null($input)) {
+            return false;
+        }
+        $input->see(new Seen(SeenKind::Key, $input, flags: $event->modifierFlags(), code: $event->keyCode(), down: $down, repeat: $down && $event->isARepeat()));
+        if ($down) {
+            $this->native->interpretKeyEvents([$event]);
+        }
+
+        return true;
+    }
+
+    /** @internal flagsChanged: while first responder */
+    public function flagged(NSEvent $event): bool
+    {
+        $input = $this->keyboardInput();
+        if (is_null($input)) {
+            return false;
+        }
+        $input->see(new Seen(SeenKind::Flags, $input, flags: $event->modifierFlags(), code: $event->keyCode()));
+
+        return true;
+    }
+
+    /** @internal insertText: from interpretKeyEvents: */
+    public function typed(string $text): bool
+    {
+        $input = $this->keyboardInput();
+        if (is_null($input)) {
+            return false;
+        }
+        $input->see(new Seen(SeenKind::Text, $input, text: $text));
+
+        return true;
+    }
+
+    public function native(): ObjCFocusView
     {
         return $this->native;
     }
@@ -95,6 +163,9 @@ class AppkitCanvas extends TKCanvas implements PacedStage
 
     public function remove(): void
     {
+        foreach (['acceptsFirstResponder', 'keyDown:', 'keyUp:', 'flagsChanged:', 'insertText:replacementRange:', 'doCommandBySelector:'] as $selector) {
+            $this->native->off($selector);
+        }
         $this->due = null;
         $this->link?->invalidate();
         [$this->link, $this->ticker] = [null, null];
@@ -108,16 +179,47 @@ class AppkitCanvas extends TKCanvas implements PacedStage
         return $this->host()->native()->backingScaleFactor();
     }
 
+    /** Core Graphics takes either byte order as it is: R G B X, or B G R X. */
+    public function hostFormats(): array
+    {
+        return [FormatSpec::rgba8(), FormatSpec::bgra8()];
+    }
+
+    /** @throws ToolkitRuntimeException When the bytes are not $width x $height pixels, or $format is not one of hostFormats(). */
+    public function displayPixels(string $pixels, int $width, int $height, FormatSpec $format): void
+    {
+        $this->live();
+        if ($width < 1 || $height < 1 || strlen($pixels) !== $width * $height * 4) {
+            throw new ToolkitRuntimeException("Canvas '{$this->path()}' was given ".strlen($pixels)." bytes for {$width}x{$height} pixels: four bytes a pixel takes ".($width * $height * 4).'.');
+        }
+        match (true) {
+            $format->equals(FormatSpec::rgba8()) => $this->applyPixels($pixels, $width, $height),
+            // B G R X read as a little-endian word, the alpha byte first and skipped
+            $format->equals(FormatSpec::bgra8()) => $this->showImage($pixels, $width, $height, kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little),
+            default => throw new ToolkitRuntimeException("Canvas '{$this->path()}' shows RGBA8 and BGRA8 pixels as they are, and was given another format."),
+        };
+    }
+
     /** @throws ToolkitRuntimeException When Core Foundation makes no data or Core Graphics refuses the image. */
     protected function applyPixels(string $rgba8, int $width, int $height): void
     {
-        self::$space ??= CGColorSpace::createWithName(kCGColorSpaceSRGB);
-        $data = CFData::create(null, $rgba8, strlen($rgba8));
-        $provider = is_null($data) ? null : CGDataProvider::createWithCFData($data);
         // R G B X read as a big-endian word: the bytes in the order they were given
+        $this->showImage($rgba8, $width, $height, kCGImageAlphaNoneSkipLast | kCGBitmapByteOrder32Big);
+    }
+
+    /**
+     * The bytes as the layer's contents, read as $bitmapInfo says.
+     *
+     * @throws ToolkitRuntimeException When Core Foundation makes no data or Core Graphics refuses the image.
+     */
+    private function showImage(string $pixels, int $width, int $height, int $bitmapInfo): void
+    {
+        self::$space ??= CGColorSpace::createWithName(kCGColorSpaceSRGB);
+        $data = CFData::create(null, $pixels, strlen($pixels));
+        $provider = is_null($data) ? null : CGDataProvider::createWithCFData($data);
         $image = is_null($provider) ? null : CGImage::create(
             $width, $height, 8, 32, $width * 4, self::$space,
-            kCGImageAlphaNoneSkipLast | kCGBitmapByteOrder32Big, $provider, null, true, kCGRenderingIntentDefault,
+            $bitmapInfo, $provider, null, true, kCGRenderingIntentDefault,
         );
         if (is_null($image)) {
             throw new ToolkitRuntimeException("Canvas '{$this->path()}' could not show a {$width}x{$height} image.");

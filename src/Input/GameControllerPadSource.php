@@ -7,26 +7,24 @@ use Closure;
 use Surface\Contracts\HumanInput\GamepadAxis;
 use Surface\Contracts\HumanInput\GamepadButton;
 use Surface\Contracts\HumanInput\HumanInputException;
-use Surface\Contracts\HumanInput\PadSource;
 use Surface\HumanInput\Devices\GameController;
 use Surface\HumanInput\Devices\GamePad;
-use Surface\HumanInput\InputFrame;
+use Surface\HumanInput\PadSource;
 
 /**
- * HumanInput's 'gamecontroller' pad source: GameController.framework's pads, read by polling,
- * as `gc-<hash>` devices for every toolkit's windows and for scripts with none. An extended
- * gamepad is a game controller with the buttons it has and all six axes; a micro gamepad is a
- * game pad. No hardware id (the framework exposes none that survives a reconnect); player
- * indexes 0 to 3 light the pad's LEDs.
+ * The 'gamecontroller' pad source: GameController.framework's pads, read by polling, as
+ * `gc-<hash>` devices every stage reads. An extended gamepad is a game controller with the buttons
+ * it has and all six axes; a micro gamepad is a game pad. No hardware id (the framework exposes
+ * none that survives a reconnect); player indexes 0 to 3 light the pad's LEDs.
  *
- * GameController updates values on the main run loop: with no toolkit session connected,
- * poll() runs it for an instant first. Its input reaches the active app only, unless macOS
- * grants background events, asked for on the first connect notification or listed pad (SDL
- * found asking earlier crashes macOS 12.3). macOS 15.4.x refuses them: with a session, pads
- * follow focus as keys do; with none the process never becomes active, so pad reads say so
- * and name 'sdl3', which reads pads through IOKit HID whatever app is active.
+ * GameController updates values on the main run loop: with no toolkit session connected, poll()
+ * runs it for an instant first. Its input reaches the active app only, unless macOS grants
+ * background events, asked for on the first connect notification or listed pad (SDL found asking
+ * earlier crashes macOS 12.3). macOS 15.4.x refuses them: with a session, pads follow focus as keys
+ * do; with none the process never becomes active, so pad reads say so and name 'sdl3', which reads
+ * pads through IOKit HID whatever app is active.
  */
-final class GameControllerPadSource implements PadSource
+final class GameControllerPadSource extends PadSource
 {
     private bool $connected = false;
 
@@ -41,17 +39,24 @@ final class GameControllerPadSource implements PadSource
     /** Released for focus loss: readings wait until the app is active again. */
     private bool $at_rest = false;
 
-    /** @var array<string, GamePad> by id */
-    private array $devices = [];
-
     /**
      * @param Closure(): bool $sessions whether any toolkit session is connected now: one pumps the main run loop and can make the process active
+     *
+     * @throws HumanInputException When AppKit is not here.
      */
     public function __construct(
-        private readonly InputFrame $frame,
         private readonly Closure $sessions,
         private readonly GameControllers $controllers = new SystemGameControllers(),
-    ) {}
+    ) {
+        if (! extension_loaded('appkit')) {
+            throw new HumanInputException('ext-appkit is not loaded.');
+        }
+    }
+
+    public function name(): string
+    {
+        return 'gamecontroller';
+    }
 
     /** The macOS version, as SystemVersion.plist states it; 'unknown' when it cannot be read. */
     public static function macosVersion(string $plist = '/System/Library/CoreServices/SystemVersion.plist'): string
@@ -84,19 +89,15 @@ final class GameControllerPadSource implements PadSource
         }
 
         $this->controllers->unwatch();
-        [$this->devices, $this->notified, $this->resigned, $this->at_rest, $this->connected] = [[], false, false, false, false];
+        foreach (array_keys($this->pads) as $id) {
+            $this->remove($id);
+        }
+        [$this->notified, $this->resigned, $this->at_rest, $this->connected] = [false, false, false, false];
     }
 
     public function connected(): bool
     {
         return $this->connected;
-    }
-
-    public function settle(): void
-    {
-        foreach ($this->devices as $device) {
-            $device->settle();
-        }
     }
 
     public function poll(): void
@@ -119,9 +120,13 @@ final class GameControllerPadSource implements PadSource
         $listed = [];
         foreach ($readings as $reading) {
             $listed[$reading->id] = $reading;
-            $this->devices[$reading->id] ??= $this->device($reading);
+            if (! isset($this->pads[$reading->id])) {
+                $this->add($this->device($reading));
+            }
         }
-        $this->devices = array_intersect_key($this->devices, $listed);
+        foreach (array_keys(array_diff_key($this->pads, $listed)) as $gone) {
+            $this->remove($gone);
+        }
 
         if ($this->background === false && $session && ! $this->following()) {
             return;
@@ -129,7 +134,7 @@ final class GameControllerPadSource implements PadSource
         $this->resigned = false;
 
         foreach ($listed as $id => $reading) {
-            $device = $this->devices[$id];
+            $device = $this->pads[$id];
             foreach ($reading->buttons as $button => $down) {
                 $device->update(GamepadButton::from($button), $down);
             }
@@ -142,25 +147,18 @@ final class GameControllerPadSource implements PadSource
     }
 
     /**
-     * @return array<string, GamePad> pads without sticks, by id
      * @throws HumanInputException macOS refuses pad input to a process that cannot become active.
      */
-    public function gamePads(): array
+    public function pads(): array
     {
-        $this->refusal();
+        if ($this->background === false && ! ($this->sessions)()) {
+            throw new HumanInputException(sprintf(
+                "gamecontroller: macOS %s gives game pads only to the active app (GCController.shouldMonitorBackgroundEvents reads back false: a 15.4 regression Apple fixed in 15.5), and a process with no window never becomes active. Set human-input.pads to 'sdl3', which reads pads through IOKit HID whatever app is active, or update macOS.",
+                self::macosVersion(),
+            ));
+        }
 
-        return array_filter($this->devices, fn (GamePad $device): bool => ! $device instanceof GameController);
-    }
-
-    /**
-     * @return array<string, GameController> pads with sticks, by id
-     * @throws HumanInputException macOS refuses pad input to a process that cannot become active.
-     */
-    public function gameControllers(): array
-    {
-        $this->refusal();
-
-        return array_filter($this->devices, fn (GamePad $device): bool => $device instanceof GameController);
+        return parent::pads();
     }
 
     /** Whether macOS grants pad input while the app is not active; null until a pad connected. */
@@ -179,7 +177,7 @@ final class GameControllerPadSource implements PadSource
         if ($this->resigned) {
             $this->resigned = false;
             $this->at_rest = true;
-            foreach ($this->devices as $device) {
+            foreach ($this->pads as $device) {
                 $device->releaseAll();
             }
         }
@@ -191,23 +189,19 @@ final class GameControllerPadSource implements PadSource
         return true;
     }
 
-    /** @throws HumanInputException */
-    private function refusal(): void
-    {
-        if ($this->background === false && ! ($this->sessions)()) {
-            throw new HumanInputException(sprintf(
-                "gamecontroller: macOS %s gives game pads only to the active app (GCController.shouldMonitorBackgroundEvents reads back false: a 15.4 regression Apple fixed in 15.5), and a script with no window never becomes active. Set human-input.pads.mac to 'sdl3', which reads pads through IOKit HID whatever app is active, or update macOS.",
-                self::macosVersion(),
-            ));
-        }
-    }
-
     private function device(GcReading $reading): GamePad
     {
         $buttons = array_map(GamepadButton::from(...), array_keys($reading->buttons));
+        if ($reading->axes === []) {
+            return new GamePad($reading->id, $reading->name, $buttons, null, $reading->lights);
+        }
 
-        return $reading->axes === []
-            ? new GamePad($this->frame, $reading->id, $reading->name, $buttons, null, $reading->lights)
-            : new GameController($this->frame, $reading->id, $reading->name, $buttons, array_map(GamepadAxis::from(...), array_keys($reading->axes)), null, $reading->lights);
+        $controller = new GameController($reading->id, $reading->name, $buttons, null, $reading->lights);
+        // every axis it has reads from the start, centred
+        foreach (array_keys($reading->axes) as $axis) {
+            $controller->setAxis(GamepadAxis::from($axis), 0.0);
+        }
+
+        return $controller;
     }
 }

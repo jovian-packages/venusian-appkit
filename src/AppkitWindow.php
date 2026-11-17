@@ -36,10 +36,7 @@ class AppkitWindow extends ToolkitWindow
 
     protected bool $key = false;
 
-    /**
-     * Not built yet: AppkitFocus taps the session's events (tap(), afterDispatch()), and the
-     * session has no taps until input routing has a home in topside. Null until then.
-     */
+    /** The window's focus as primitives: compared after each event the session's pump takes. */
     protected ?AppkitFocus $focus = null;
 
     protected bool $confirming = false;
@@ -300,7 +297,7 @@ class AppkitWindow extends ToolkitWindow
         is_null($this->focus) ? $move() : $this->focus->quietly($move);
     }
 
-    /** The window's focus as primitives; primitives move focus through it. Null until input routing is ported. */
+    /** The window's focus as primitives; primitives move focus through it. Detached once the window closes. */
     public function focusTracker(): ?AppkitFocus
     {
         return $this->focus;
@@ -408,8 +405,10 @@ class AppkitWindow extends ToolkitWindow
         $this->backing_scale = $this->window->backingScaleFactor();
         $this->window->setDelegate($this->delegate);
 
-        // Not ported yet (deprecated/Windows): the right-click, group-click, canvas click/pointer/hover,
-        // button-key and window-key taps, and AppkitFocus. They wait on where input routing lives.
+        $this->focus = new AppkitFocus($this, $this->window, $this->session);
+
+        // Not ported yet (deprecated/Windows): the right-click, group-click, button-key and window-key
+        // taps. A canvas's clicks, pointer, hover and keys are its input now (topside HumanInput).
     }
 
     protected function becameKey(): void

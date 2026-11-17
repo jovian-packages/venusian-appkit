@@ -5,6 +5,11 @@ namespace Jovian\Toolkits\Appkit\Providers;
 use ReflectionException;
 use Jovian\Toolkits\Appkit\AppkitBridge;
 use Jovian\Toolkits\Appkit\AppkitSession;
+use Jovian\Toolkits\Appkit\Input\AppkitInputBackend;
+use Jovian\Toolkits\Appkit\Input\GameControllerPadSource;
+use Surface\HumanInput\HumanInput;
+use Surface\HumanInput\HumanInputManager;
+use Surface\Toolkits\ToolkitBridge;
 use Surface\Toolkits\Toolkits;
 use Voyager\Contracts\Core\FrameworkCore;
 use Voyager\NutsAndBolts\ServiceProvider;
@@ -29,9 +34,8 @@ class VenusianAppkitServiceProvider extends ServiceProvider
     }
 
     /**
-     * The toolkit's driver, registered on the bridge by this package: Surface names no toolkit.
-     * With Surface's HumanInput bound too, the 'appkit' input engine and the 'gamecontroller'
-     * pad source.
+     * The toolkit's driver, registered on the bridge by this package: topside names no toolkit.
+     * With human input on, the 'appkit' input backend and the 'gamecontroller' pad source.
      */
     public function boot(): void
     {
@@ -42,26 +46,24 @@ class VenusianAppkitServiceProvider extends ServiceProvider
         $toolkits = $this->app->get('toolkit-bridge-manager');
         $toolkits->extend('appkit', fn ($app): AppkitBridge => new AppkitBridge($app));
 
-        //if ($this->app->has('human-input')) {
-        //    self::input($this->app->get('human-input'), $toolkits);
-        //}
+        if (HumanInput::enabled()) {
+            self::input(HumanInput::manager());
+        }
     }
 
     /**
-     * The 'appkit' input engine for the AppKit session on $toolkits, and the 'gamecontroller'
-     * pad source (human-input.pads.mac). The source runs the main run loop itself, and refuses
-     * where macOS keeps pads from a process that cannot become active, only while no toolkit
-     * session on $toolkits is connected.
+     * The 'appkit' input backend and the 'gamecontroller' pad source, when the application turned
+     * human input on. The pad source runs the main run loop itself, and refuses where macOS keeps
+     * pads from a process that cannot become active, only while no toolkit session is connected.
      */
-    /*public static function input(HumanInputManager $input, ToolkitManager $toolkits): void
+    public static function input(HumanInputManager $input): void
     {
-        $input->extend('appkit', fn (InputFrame $frame): AppkitInputEngine => new AppkitInputEngine($frame, $toolkits->driver('appkit')));
-        $input->extendPads('gamecontroller', fn (InputFrame $frame): GameControllerPadSource => new GameControllerPadSource(
-            $frame,
-            fn (): bool => array_any(
-                $toolkits->getDrivers(),
-                fn (mixed $driver): bool => $driver instanceof ToolkitBridgeDriver && $driver->session()?->connected() === true,
+        $input->extend('appkit', fn (): AppkitInputBackend => new AppkitInputBackend());
+        $input->extendPads('gamecontroller', fn (): GameControllerPadSource => new GameControllerPadSource(
+            static fn (): bool => array_any(
+                Toolkits::bridges(),
+                static fn (mixed $bridge): bool => $bridge instanceof ToolkitBridge && $bridge->session()?->connected() === true,
             ),
         ));
-    }*/
+    }
 }
