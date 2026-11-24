@@ -80,7 +80,9 @@ class Appkit implements Toolkit
     {
         if (is_null($this->application->delegate()))
         {
-            $this->delegate = new ObjCDelegate('NSApplicationDelegate');
+            // Under the NSObject protocol, which every process knows: it answers no selector, so it
+            // needs none of NSApplicationDelegate's, and that one is unknown with only appkit loaded.
+            $this->delegate = new ObjCDelegate('NSObject');
             $this->application->setDelegate($this->delegate);
         }
 

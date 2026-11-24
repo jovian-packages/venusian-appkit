@@ -3,6 +3,7 @@
 ## 2026-11-24
 
 * **Version**: 0.11.2 in composer.json, with ext-appkit `^0.11.2`. 223 passed on Homebrew PHP 8.4.27 NTS and ZTS (`XDEBUG_MODE=off`).
+* **Fix**: the application's placeholder delegate is an `ObjCDelegate` under the `NSObject` protocol, not `NSApplicationDelegate`. It answers no selector, and with ext-appkit the only extension loaded (as in CI) the runtime knows no `NSApplicationDelegate`, so every test failed there. 223 passed with only ext-appkit loaded, NTS and ZTS.
 * **CI**: `.github/workflows/tests.yml` runs the whole suite on macos-15, PHP 8.4 and 8.5, NTS and ZTS, with ext-appkit built from its `0.11.x` branch and venusian/topside resolved from its `0.11.x` checkout.
 
 ## 2026-11-22
