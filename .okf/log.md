@@ -1,5 +1,10 @@
 # Log
 
+## 2026-11-24
+
+* **Version**: 0.11.2 in composer.json, with ext-appkit `^0.11.2`. 223 passed on Homebrew PHP 8.4.27 NTS and ZTS (`XDEBUG_MODE=off`).
+* **CI**: `.github/workflows/tests.yml` runs the whole suite on macos-15, PHP 8.4 and 8.5, NTS and ZTS, with ext-appkit built from its `0.11.x` branch and venusian/topside resolved from its `0.11.x` checkout.
+
 ## 2026-11-22
 
 * **Creation**: [Menu bar](/architecture/menu-bar.md): stage 2b's AppKit bar on topside's TKMenuBar. 204 windowless tests on NTS and ZTS, and topside-dev driven through its menus with activation off. The real-window checks are still to be run.
