@@ -44,7 +44,10 @@ jobs:
           for ext in appkit; do
             git clone --depth 1 --branch 0.11.x "https://github.com/php-io-extensions/$ext.git" "../ext-$ext"
             (cd "../ext-$ext" && phpize && ./configure "--enable-$ext" && make -j"$(sysctl -n hw.ncpu)")
-            echo "extension=$(cd "../ext-$ext" && pwd)/modules/$ext.so" > "$(php -r 'echo PHP_CONFIG_FILE_SCAN_DIR;')/99-$ext.ini"
+            # Homebrew's PHP 8.5 has its scan directory compiled in but not created.
+            scan_dir="$(php -r 'echo PHP_CONFIG_FILE_SCAN_DIR;')"
+            mkdir -p "$scan_dir"
+            echo "extension=$(cd "../ext-$ext" && pwd)/modules/$ext.so" > "$scan_dir/99-$ext.ini"
             php --ri "$ext" | head -3
           done
 
