@@ -2,9 +2,9 @@
 type: Module
 title: Primitives
 description: "AppKit concretes of Surface's TK primitives: factory, the shared native trait, stack/grid/fixed/scroll containers, leaves, layout model, mail."
-resource: src/Primitives/
+resource: deprecated2/Primitives/
 tags: [appkit, primitives, autolayout, layout]
-status: draft
+status: deprecated
 generated: { by: claude-opus/5.5, at: 2026-11-11T11:00:00Z }
 sources:
   - id: trait
@@ -29,6 +29,8 @@ sources:
     resource: src/Primitives/
     title: Appkit leaf concretes
 ---
+
+> **Deprecated (2026-11-21):** Describes the bridge-era AppKit primitives, now under `deprecated2/Primitives/`. The adapter has no primitives on Topside's new TK classes yet; what it has is the [enabled cascade](/architecture/enabled-cascade.md) they will use.
 
 # Overview
 
@@ -107,3 +109,7 @@ Public on concretes for cross-object use, not for apps: `ownView`, `placedView`,
 [^fixed]: AppkitFixed
 [^scroll]: AppkitScrollView
 [^leaves]: Appkit leaf concretes
+
+# Native handle
+
+`AppkitCanvas` implements `NativeStage`. `nativeHandle()` is kind `appkit.view` and the canvas's `NSView`, the object `native()` returns. Asking adds nothing. The canvas keeps the view. A presenter adds its own child and takes that child away. `native()` stays the view.

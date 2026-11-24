@@ -4,8 +4,16 @@
          bootstrap="vendor/autoload.php"
          colors="true">
     <testsuites>
-        <testsuite name="venusian-appkit">
-            <directory suffix="Test.php">./tests</directory>
+        <testsuite name="Windowless">
+            <directory suffix="Test.php">./tests/Windowless</directory>
+        </testsuite>
+        <testsuite name="Integration">
+            <directory suffix="Test.php">./tests/Integration</directory>
         </testsuite>
     </testsuites>
+    <source>
+        <include>
+            <directory>src</directory>
+        </include>
+    </source>
 </phpunit>

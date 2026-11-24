@@ -2,9 +2,9 @@
 type: Module
 title: Windows and menus
 description: NSWindow per name, delegate mail, one app-wide NSMenu bar, default bar, About panel.
-resource: src/Windows/
+resource: deprecated2/AppkitWindow.php
 tags: [appkit, windows, menus, macos]
-status: draft
+status: deprecated
 generated: { by: claude-opus/5.5, at: 2026-11-10T22:00:00Z }
 sources:
   - id: window
@@ -17,6 +17,8 @@ sources:
     resource: src/Bridge/AppkitBridgeDriver.php
     title: AppkitBridgeDriver
 ---
+
+> **Deprecated (2026-11-21):** Describes the bridge-era `AppkitWindow` and `AppkitMenuBar`, now under `deprecated/` and `deprecated2/`. The current window is [Window](/architecture/window.md); the menu bar, focus, keys and services are not ported to it yet.
 
 # Window
 

@@ -2,9 +2,9 @@
 type: Module
 title: Staged windows
 description: AppkitStagedWindow on ObjCStageWindow and ObjCDrawView; partial present, modes incl. Spaces and exclusive fullscreen, AppkitDisplays, capabilities, lending through LendsAppkitSurfaces.
-resource: src/Windows/AppkitStagedWindow.php
+resource: deprecated/Windows/AppkitStagedWindow.php
 tags: [appkit, staged-windows, fullscreen, displays]
-status: draft
+status: deprecated
 generated: { by: claude-fable/5.2, at: 2026-11-11T14:48:28Z }
 sources:
   - id: window
@@ -17,6 +17,8 @@ sources:
     resource: src/Windows/Concerns/LendsAppkitSurfaces.php
     title: LendsAppkitSurfaces
 ---
+
+> **Deprecated (2026-11-21):** `AppkitStagedWindow` is now under `deprecated/Windows/`. Not ported.
 
 # Overview
 

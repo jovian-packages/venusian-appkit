@@ -1,40 +1,49 @@
 ---
 type: Module
 title: Session
-description: NSApplication session - launch once, Dock presence on connect, event pump with budget, CFFileDescriptor wake.
-resource: src/Bridge/AppkitSession.php
-tags: [appkit, bridge, macos]
+description: NSApplication launched once, Dock presence while connected, an event pump with a budget, and a CFFileDescriptor wake.
+resource: src/Appkit.php
+tags: [appkit, session, macos]
 status: draft
-generated: { by: claude-opus/5.5, at: 2026-10-01T20:06:29Z }
+generated: { by: claude-opus/5.5, at: 2026-11-22T20:28:54Z }
 sources:
+  - id: appkit
+    resource: src/Appkit.php
+    title: Appkit (the Toolkit)
   - id: session
-    resource: src/Bridge/AppkitSession.php
+    resource: src/AppkitSession.php
     title: AppkitSession
   - id: driver
-    resource: src/Bridge/AppkitBridgeDriver.php
-    title: AppkitBridgeDriver
+    resource: src/AppkitAdapterDriver.php
+    title: AppkitAdapterDriver
 ---
 
 # Overview
 
-`AppkitSession extends Surface\Bridge\BridgedToolkitSession`; built and cached by `AppkitBridgeDriver::connect()`. macOS only (needs ext-appkit).[^driver]
+Three classes, on Topside's toolkit layer:
 
-| Hook | AppKit calls |
+| Class | Extends / implements | Job |
+|---|---|---|
+| `AppkitAdapterDriver` | `Surface\Toolkits\Drivers\ToolkitAdapterDriver` | refuses off macOS and without ext-appkit; declares `AppkitWindow` as its window class |
+| `AppkitSession` | `Surface\Toolkits\ToolkitSession` | builds the `Appkit` toolkit once: delegate, then `finishLaunching()` |
+| `Appkit` | `Surface\Contracts\Toolkits\Toolkit` | the AppKit calls below |
+
+The window list and the after-pump settle are Topside's (`ToolkitSession`).[^session]
+
+# Calls
+
+| When | AppKit calls |
 |---|---|
-| initialize (once) | `NSApplication::sharedApplication()`; an empty `ObjCDelegate('NSApplicationDelegate')` as its delegate when it has none (held by the session; SDL video takes an empty slot); `finishLaunching()` |
-| connect | activation policy `REGULAR` (Dock icon, app switcher), `activateIgnoringOtherApps(true)` |
-| disconnect | activation policy `PROHIBITED`: headless, windows untouched |
-| `pump($ns)` | `nextEventMatchingMask(ANY, until, default mode, dequeue)` + `sendEvent`; first wait ends at `now + budget`, rest at `distantPast` (drain); then `updateWindows()`, then `AppkitCanvas::sweepSdlWindows()` |
+| built (once per process) | `NSApplication::sharedApplication()`; when it has no delegate, an `ObjCDelegate('NSApplicationDelegate')` that answers no selector (SDL's video subsystem makes itself the delegate of an application that has none); `finishLaunching()` |
+| `connect()` | activation policy `REGULAR` (Dock icon), `activateIgnoringOtherApps(true)` |
+| `disconnect()` | activation policy `PROHIBITED` |
+| `pump($ns)` | `nextEventMatchingMaskUntilDateInModeDequeue(ANY, until, NSDefaultRunLoopMode, true)` in a loop: the first wait runs until now + budget, the rest until `distantPast` (no wait); each event goes to `sendEvent()` unless a withholder filter keeps it, then the after-dispatch callbacks run; then `updateWindows()` |
 
-`activateIgnoringOtherApps`, not `activate`: macOS declines the cooperative request for a terminal-launched process, and no window of an inactive app becomes key.[^session]
+`withhold($owner, $filter)` and `stopWithholding($owner)` fill `withholders`; the [menu bar](/architecture/menu-bar.md) uses them for bare keys. Nothing adds to `after_dispatch` yet.[^appkit]
 
 # Wake
 
-`wakeDescriptor($fd)`: `CFFileDescriptor` on the loop's fd, run-loop source in common modes on the main run loop. Callout posts an `APPLICATION_DEFINED` NSEvent at the queue head → ends `nextEventMatchingMask`'s wait. Callbacks re-enabled at the top of every pump (one-shot). Release: remove source, invalidate.
+`wakeDescriptor($fd)`: a `CFFileDescriptor` on the loop's descriptor, added to the main run loop in the common modes. Its callout posts an `APPLICATION_DEFINED` event at the front of the queue, which ends the pump's wait. The callout is one-shot: each `pump()` re-enables `kCFFileDescriptorReadCallBack`.[^appkit]
 
-# About
-
-`showAbout(array)`: `orderFrontStandardAboutPanelWithOptions`, keys `ApplicationName`, `ApplicationVersion` + `Version`, `Copyright` from `windows.about`; empty values omitted. Standard panel, non-modal, AppKit keeps one.
-
+[^appkit]: Appkit (the Toolkit)
 [^session]: AppkitSession
-[^driver]: AppkitBridgeDriver

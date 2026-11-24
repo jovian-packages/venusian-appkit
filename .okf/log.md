@@ -1,5 +1,32 @@
 # Log
 
+## 2026-11-22
+
+* **Creation**: [Menu bar](/architecture/menu-bar.md): stage 2b's AppKit bar on topside's TKMenuBar. 204 windowless tests on NTS and ZTS, and topside-dev driven through its menus with activation off. The real-window checks are still to be run.
+* **Update**: [UI primitives](/architecture/ui-primitives.md): list, collection and tree on Topside's TK classes, in the primitive map.
+* **Update**: [UI primitives](/architecture/ui-primitives.md): table and text area on Topside's TK classes, in the primitive map.
+* **Update**: [UI primitives](/architecture/ui-primitives.md): scroll view, tab view, split view and grid on Topside's TK classes, in the primitive map.
+* **Update**: [UI primitives](/architecture/ui-primitives.md): separator, progress bar, spinner, slider, toggle button, segmented control and image on Topside's TK classes, in the primitive map.
+
+## 2026-11-21
+
+* **Update**: [UI primitives](/architecture/ui-primitives.md): text input, combo box, date picker and link on Topside's TK classes; text styling moved from the label to `AppkitText`. 30 real-window checks pass.
+* **Update**: [UI primitives](/architecture/ui-primitives.md): check box, switch and dropdown on Topside's `TKCheckbox`, `TKToggle`, `TKDropdown`, in the primitive map. 11 real-window checks pass.
+* **Update**: [UI primitives](/architecture/ui-primitives.md): a stack's own hugging is 740, under its children's 750, so START and END alignment across a column or row no longer stretch the child. Checked in topside-dev with START, CENTER, END and FILL buttons in one column.
+* **Creation**: [UI primitives](/architecture/ui-primitives.md): column, row, fixed, label and button on Topside's TK classes; the driver declares the primitive map and the window mounts the content column. 35 real-window harness checks pass. Commit 6eb1d79.
+* **Update**: [Session](/architecture/session.md) rewritten for the Surface toolkit layer: `Appkit` (the Toolkit), `AppkitSession`, `AppkitAdapterDriver` replace the bridge session and driver; the window list and after-pump settle are Topside's. Commit `3599c1b`.
+* **Creation**: [Window](/architecture/window.md): `AppkitWindow` on Topside's `ToolkitWindow` lifecycle; gains `isOpen()` and `native()`. Checked in a scratch topside-dev: open, resize from code, confirm-close and `close()` post the right mail.
+* **Creation**: [Enabled cascade](/architecture/enabled-cascade.md): `CarriesEnabledDown` and `TakesInputFromAbove` in `src/UI/Concerns/`, since AppKit cannot pass a container's disabled state down. 11 checks on real NSView and NSButton widgets.
+* **Update**: the provider is on `ToolkitAdapterServiceProvider` and builds no driver until `toolkits.default` asks for `appkit`.
+* **Deprecation**: [Windows and menus](/architecture/windows-and-menus.md), [Staged windows](/architecture/staged-windows.md), [Primitives](/architecture/primitives.md) and [Input](/architecture/input.md) describe code now under `deprecated/` and `deprecated2/`; kept for history.
+* Not reviewed: [Testing](/runbooks/testing.md) still describes the bridge-era helpers; `tests/Pest.php` builds the new driver, and the suite was not run. `config/appkit.php` (`backend.stage.color_space`) has no concept yet.
+
+## 2026-11-19
+
+* `AppkitColorSpace` names the Core Graphics color spaces: RGB (sRGB through BT.2020), HDR (Display P3 and BT.2100, HLG and PQ), grayscale, and CMYK, CIE XYZ, CIE Lab, and ACEScg. Each value is the `kCGColorSpace*` string `CGColorSpace::createWithName()` accepts.
+* The native handle lends the `NSView` itself, not its address (Topside `70610dc`). [primitives](architecture/primitives.md)
+* `AppkitCanvas` offers a native handle, kind `appkit.view`, the address of its `NSView`. Checked in a hidden window: the address is that view. [primitives](architecture/primitives.md)
+
 ## 2026-11-11
 
 * Video through ext-avkit: `AVPlayer`, `AVPlayerItem`, `AVPlayerView` and `CMTime` moved from ext-appkit (0.11.2) to ext-avkit (^0.11.2), now required. `AppkitPlayer` calls the C-named `CMTimeMake()`, `CMTimeMakeWithSeconds()` and `CMTimeGetSeconds()` that replace `CMTime::make()`, `makeWithSeconds()` and `getSeconds()`. Full suite 499 passed on ZTS and NTS (the session budget test with `XDEBUG_MODE=off`).

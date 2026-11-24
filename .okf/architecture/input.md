@@ -2,9 +2,9 @@
 type: Module
 title: Input
 description: AppkitInputEngine and GameControllerPadSource, HumanInput's appkit engine and gamecontroller pad source.
-resource: src/Input/AppkitInputEngine.php
+resource: deprecated/Input/AppkitInputEngine.php
 tags: [appkit, human-input, gamecontroller]
-status: draft
+status: deprecated
 generated: { by: claude-opus/5.5, at: 2026-10-09T00:00:00Z }
 sources:
   - id: engine
@@ -14,6 +14,8 @@ sources:
     resource: src/Input/GameControllerPadSource.php
     title: GameControllerPadSource
 ---
+
+> **Deprecated (2026-11-21):** `AppkitInputEngine` is now under `deprecated/Input/` and `GameControllerPadSource` under `deprecated2/Input/`. Not ported.
 
 # Engine
 

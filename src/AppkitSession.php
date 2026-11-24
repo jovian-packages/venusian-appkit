@@ -2,231 +2,47 @@
 
 namespace Jovian\Toolkits\Appkit;
 
-use NSDate;
-use NSEvent;
-use NSPoint;
-use CFRunLoop;
-use NSEventType;
-use NSEventMask;
-use ObjCDelegate;
-use NSApplication;
-use CFFileDescriptor;
-use CFRunLoopSource;
-use Closure;
-use NSApplicationActivationPolicy;
+use NSAttributedString;
 use Surface\Toolkits\ToolkitSession;
-
+use Surface\Toolkits\Menus\AboutPanel;
 
 class AppkitSession extends ToolkitSession
 {
-    /**
-     * The shared application, from initialization until the process ends.
-     * @var NSApplication|null
-     */
-    protected ?NSApplication $application = null;
+    protected function bootstrapToolkitLibrary(): void
+    {
+        $this->application = new Appkit()
+            ->setDelegate()
+            ->finishLaunching();
+    }
 
     /**
-     * The application's delegate when it had none: a trampoline answering no selector, so AppKit
-     * behaves as with no delegate while the slot is taken. SDL's video subsystem makes itself the
-     * delegate (and the URL event handler) of an application that has none. AppKit holds it weakly.
-     * @var ObjCDelegate|null
+     * AppKit's standard About panel with the application's fields.
      */
-    protected ?ObjCDelegate $delegate = null;
+    public function showAbout(AboutPanel $panel): void
+    {
+        $this->application()->get()->orderFrontStandardAboutPanelWithOptions(self::aboutOptions($panel));
+    }
 
     /**
-     * The loop's waiter descriptor as a run-loop source, while joined.
-     * @var CFFileDescriptor|null
-     */
-    protected ?CFFileDescriptor $wake = null;
-
-    /**
-     * @var CFRunLoopSource|null
-     */
-    protected ?CFRunLoopSource $wake_source = null;
-
-    /**
-     * What keeps an event from AppKit, by owner: a filter that answers true for an event it handled.
-     * @var array<int, Closure(NSEvent): bool>
-     */
-    protected array $withholders = [];
-
-    /**
-     * What runs after each event the pump took, once AppKit has finished with it, by owner.
-     * @var array<int, Closure(): void>
-     */
-    protected array $after_dispatch = [];
-
-    /**
-     * Keep from AppKit each event $filter answers true for: the filter handled it, and the pump does
-     * not dispatch it. A local monitor cannot do this for every event (returning nil from one stops
-     * a key-up, not a key-down), so it is done where the pump takes events. Null lets go.
+     * An empty string where a field is not given: without one AppKit shows the PHP binary's own.
+     * 'Version' is the build, which it shows in brackets after the version.
      *
-     * @param (Closure(NSEvent): bool)|null $filter
+     * @internal
+     * @return array<string, string|NSAttributedString>
      */
-    public function withholdWhere(object $owner, ?Closure $filter): void
+    public static function aboutOptions(AboutPanel $panel): array
     {
-        if (is_null($filter)) {
-            unset($this->withholders[spl_object_id($owner)]);
-
-            return;
-        }
-        $this->withholders[spl_object_id($owner)] = $filter;
-    }
-
-    /**
-     * Run $settle after each event the pump takes, dispatched or withheld, once AppKit has finished
-     * with it. Null lets go.
-     *
-     * @param (Closure(): void)|null $settle
-     */
-    public function afterDispatch(object $owner, ?Closure $settle): void
-    {
-        if (is_null($settle)) {
-            unset($this->after_dispatch[spl_object_id($owner)]);
-
-            return;
-        }
-        $this->after_dispatch[spl_object_id($owner)] = $settle;
-    }
-
-    /** Dispatch one event the pump took: unless a filter withheld it, AppKit gets it; then what runs after each event runs. */
-    protected function dispatch(NSEvent $event): void
-    {
-        $withheld = false;
-        foreach ($this->withholders as $filter) {
-            if ($filter($event)) {
-                $withheld = true;
-                break;
-            }
-        }
-        if (! $withheld) {
-            $this->application->sendEvent($event);
-        }
-        foreach ($this->after_dispatch as $settle) {
-            $settle();
-        }
-    }
-
-
-
-    /**
-     * The shared application, for window hosts.
-     * @return NSApplication
-     */
-    public function application(): NSApplication
-    {
-        return $this->application;
-    }
-
-    /**
-     * Take hold of the shared NSApplication and finish launching it: the part that cannot be repeated.
-     * @return void
-     */
-    protected function initializeEngine(): void
-    {
-        $this->application = NSApplication::sharedApplication();
-        $this->setDelegate();
-        $this->application->finishLaunching();
-    }
-
-    protected function connectToEngine(): void
-    {
-        $this->application->setActivationPolicy(
-            NSApplicationActivationPolicy::REGULAR
-        );
-
-        $this->application->activateIgnoringOtherApps(true);
-    }
-
-    /**
-     * Drop out of the Dock and the app switcher, leaving the app running headless.
-     */
-    protected function disconnectEngine(): void
-    {
-        $this->application->setActivationPolicy(NSApplicationActivationPolicy::PROHIBITED);
-    }
-
-    /**
-     * Show the standard About panel. A missing or empty field keeps AppKit's own value.
-     * @param array{name?: string|null, version?: string|null, copyright?: string|null} $about
-     */
-    public function showAbout(array $about): void
-    {
-        $options = [];
-        if (! empty($about['name'])) {
-            $options['ApplicationName'] = (string) $about['name'];
-        }
-        if (! empty($about['version'])) {
-            $options['ApplicationVersion'] = (string) $about['version'];
-            $options['Version'] = (string) $about['version'];
-        }
-        if (! empty($about['copyright'])) {
-            $options['Copyright'] = (string) $about['copyright'];
+        $options = [
+            'ApplicationName' => $panel->name,
+            'ApplicationVersion' => $panel->version ?? '',
+            'Version' => '',
+            'Copyright' => $panel->copyright ?? '',
+        ];
+        if (! is_null($panel->credits)) {
+            // The panel takes credits as an attributed string only.
+            $options['Credits'] = NSAttributedString::initWithStringAttributes($panel->credits, []);
         }
 
-        $this->application->orderFrontStandardAboutPanelWithOptions($options);
+        return $options;
     }
-
-    /**
-     * Wait at most $budget_ns for the next event, then dispatch it and everything queued behind it.
-     *
-     * @param int $budget_ns Zero dispatches what is queued without waiting.
-     * @return int Events dispatched.
-     */
-    public function pump(int $budget_ns): int
-    {
-        // The wake callout is one-shot: re-armed for each wait, so a descriptor the loop has not
-        // read yet cannot keep posting while the queue is drained.
-        $this->wake?->enableCallBacks(kCFFileDescriptorReadCallBack);
-
-        $until = $budget_ns > 0 ? NSDate::dateWithTimeIntervalSinceNow($budget_ns / 1e9) : NSDate::distantPast();
-        $dispatched = 0;
-
-        while ($event = $this->application->nextEventMatchingMaskUntilDateInModeDequeue(NSEventMask::ANY, $until, NSDefaultRunLoopMode, true)) {
-            $this->dispatch($event);
-            $dispatched++;
-            $until = NSDate::distantPast();
-        }
-        $this->application->updateWindows();
-
-        return $dispatched;
-    }
-
-    /**
-     * The descriptor becomes a run-loop source whose callout posts an application-defined event:
-     * that is what ends nextEventMatchingMask's wait.
-     */
-    protected function wakeDescriptor(int $fd): void
-    {
-        $application = $this->application;
-
-        $this->wake = CFFileDescriptor::create(null, $fd, false, function () use ($application): void {
-            $application->postEventAtStart(NSEvent::otherEventWithTypeLocationModifierFlagsTimestampWindowNumberContextSubtypeData1Data2(
-                NSEventType::APPLICATION_DEFINED, new NSPoint(0.0, 0.0), 0, 0.0, 0, null, 0, 0, 0,
-            ), false);
-        });
-        $this->wake_source = $this->wake->createRunLoopSource(null, 0);
-        CFRunLoop::getMain()->addSource($this->wake_source, kCFRunLoopCommonModes);
-    }
-
-    protected function releaseWakeDescriptor(): void
-    {
-        if (! is_null($this->wake_source)) {
-            CFRunLoop::getMain()->removeSource($this->wake_source, kCFRunLoopCommonModes);
-        }
-        $this->wake?->invalidate();
-        $this->wake = null;
-        $this->wake_source = null;
-    }
-
-    private function setDelegate(): void
-    {
-        if (is_null($this->application->delegate()))
-        {
-            $this->delegate = new ObjCDelegate('NSApplicationDelegate');
-            $this->application->setDelegate($this->delegate);
-        }
-    }
-
-
 }

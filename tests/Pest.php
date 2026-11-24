@@ -2,108 +2,69 @@
 
 declare(strict_types=1);
 
-use deprecated\Bridge\AppkitBridgeDriver;
-use deprecated\Bridge\AppkitSession;
-use Jovian\Toolkits\Appkit\Input\AppkitInputEngine;
-use Jovian\Toolkits\Appkit\Primitives\AppkitTextArea;
-use Surface\Bridge\ToolkitManager;
-use Surface\Bridge\ToolkitPump;
-use Surface\Contracts\Drawing\LentSurface;
-use Surface\Contracts\Drawing\SurfaceBorrower;
-use Surface\Contracts\Framebuffers\FormatSpec;
-use Surface\Contracts\Framebuffers\Framebuffer;
-use Surface\Contracts\Windows\Mail\View\PrimitiveMail;
-use Surface\Framebuffers\Native\NativeDirtyFramebuffer;
-use Surface\HumanInput\InputFrame;
-use Surface\Windows\ToolkitWindowManager;
+use Jovian\Toolkits\Appkit\AppkitAdapterDriver;
+use Jovian\Toolkits\Appkit\Providers\VenusianAppkitServiceProvider;
+use Jovian\Toolkits\Appkit\AppkitSession;
+use Jovian\Toolkits\Appkit\AppkitWindow;
+use Surface\Core\Providers\TopsideServiceProvider;
+use Surface\Toolkits\EventLoop\ToolkitPump;
+use Surface\Toolkits\ToolkitAdapters;
 use Voyager\Config\Repository;
+use Voyager\Core\RenderedInstance;
 use Voyager\Vessel\ControlPanel;
-use Windows\AppkitStagedWindow;
-use Windows\AppkitWindow;
+
+/*
+| Integration tests: a real framework core with topside and this package's provider, driving
+| AppKit itself through the one workflow the package serves: register, connect, open a window,
+| present it, resize it, close it. One native application per process, so every test shares one
+| core, one driver and one session; each starts with no window open and no mail pending.
+*/
 
 if (! extension_loaded('appkit')) {
-    throw new RuntimeException('venusian-appkit tests need ext-appkit loaded.');
+    throw new RuntimeException('venusian-appkit integration tests need ext-appkit loaded.');
 }
 
-const TEST_MENUS = [
-    'main' => [
-        ['label' => 'App', 'items' => [
-            ['role' => 'about', 'label' => 'About'],
-            ['separator' => true],
-            ['role' => 'quit', 'label' => 'Quit', 'hotkey' => 'q'],
-        ]],
-        ['label' => 'View', 'items' => [
-            ['id' => 'grid', 'label' => 'Show Grid', 'toggle' => true, 'on' => false],
-            ['id' => 'view.refresh', 'label' => 'Refresh', 'keys' => 'Primary+Shift+F5'],
-            ['id' => 'view.next', 'label' => 'Next Difference', 'keys' => 'Alt+Down'],
-            ['id' => 'view.tab', 'label' => 'Next Tab', 'keys' => 'Primary+]'],
-            ['id' => 'view.erase', 'label' => 'Erase', 'keys' => 'Primary+BACKSPACE'],
-            ['id' => 'view.locked', 'label' => 'Locked', 'enabled' => false, 'items' => [
-                ['id' => 'view.locked.item', 'label' => 'Item'],
-            ]],
-        ]],
-    ],
-    'choices' => [
-        ['label' => 'App', 'items' => [['role' => 'quit', 'label' => 'Quit', 'hotkey' => 'q']]],
-        ['id' => 'compare', 'label' => 'Compare', 'items' => [
-            ['id' => 'case.none', 'label' => 'None', 'radio' => 'ignore-case', 'on' => true],
-            ['id' => 'case.unimportant', 'label' => 'Unimportant', 'radio' => 'ignore-case'],
-            ['id' => 'case.all', 'label' => 'All', 'radio' => 'ignore-case'],
-            ['separator' => true],
-            ['id' => 'compare.wrap', 'label' => 'Wrap', 'toggle' => true],
-            ['id' => 'compare.more', 'label' => 'More', 'items' => [['id' => 'compare.more.deep', 'label' => 'Deep']]],
-        ]],
-    ],
-    'tools' => [
-        ['label' => 'Tools', 'items' => [
-            ['id' => 'tools.measure', 'label' => 'Measure'],
-        ]],
-    ],
-    'editing' => [
-        ['label' => 'App', 'items' => [
-            ['role' => 'quit', 'label' => 'Quit', 'hotkey' => 'q'],
-        ]],
-        ['label' => 'Edit', 'items' => [
-            ['role' => 'undo', 'label' => 'Undo'],
-            ['role' => 'redo', 'label' => 'Redo'],
-            ['separator' => true],
-            ['role' => 'cut', 'label' => 'Cut'],
-            ['role' => 'copy', 'label' => 'Copy'],
-            ['role' => 'paste', 'label' => 'Paste'],
-            ['role' => 'select-all', 'label' => 'Select All'],
-            ['separator' => true],
-            ['id' => 'edit.find', 'label' => 'Find'],
-            ['id' => 'edit.more', 'label' => 'More', 'items' => [
-                ['id' => 'edit.more.item', 'label' => 'Item'],
-            ]],
-        ]],
-    ],
-];
+pest()->beforeEach(function (): void {
+    closeAll();
+})->in('Integration');
 
 /**
- * The one driver for the process: AppKit has one shared application, so every test
- * shares the driver, its session and its windows, through a container like the one
- * the framework hands the bridge.
+ * The shared core, made the current container again: a test may build its own.
  */
-function driver(): AppkitBridgeDriver
+function toolkitApp(): RenderedInstance
 {
-    static $driver = null;
+    static $app = null;
 
-    if (is_null($driver)) {
-        $container = new ControlPanel();
-        $container->registerInstance('config', new Repository([
-            'windows' => [
-                'about' => ['name' => 'venusian-appkit tests', 'version' => '0.10.0', 'copyright' => null],
-                'default_menu' => 'main',
-                'menus' => TEST_MENUS,
-            ],
-        ]));
-        $container->registerInstance('toolkit-bridge', $toolkits = new ToolkitManager($container));
-        $container->registerInstance('toolkit-windows', new ToolkitWindowManager($toolkits, TEST_MENUS, 'main'));
-        $driver = new AppkitBridgeDriver($container);
+    if (is_null($app)) {
+        $app = bootCore();
     }
+    ControlPanel::setInstance($app);
 
-    return $driver;
+    return $app;
+}
+
+/**
+ * A booted framework core with topside and this package registered, appkit selected.
+ */
+function bootCore(array $config = []): RenderedInstance
+{
+    $app = new RenderedInstance(sys_get_temp_dir());
+    $app->registerInstance('config', new Repository(array_replace_recursive([
+        'app' => ['name' => 'venusian-appkit-tests'],
+        'toolkits' => ['default' => 'appkit'],
+    ], $config)));
+    $app->register(TopsideServiceProvider::class);
+    $app->register(VenusianAppkitServiceProvider::class);
+    $app->boot();
+
+    return $app;
+}
+
+function driver(): AppkitAdapterDriver
+{
+    toolkitApp();
+
+    return ToolkitAdapters::driver();
 }
 
 function session(): AppkitSession
@@ -111,42 +72,87 @@ function session(): AppkitSession
     return driver()->connect();
 }
 
-/** Mail the session is holding for a loop, taken out. */
-function takeMail(AppkitSession $session): array
+/**
+ * Open and present a window, pumping until its content area has the size asked for.
+ */
+function openWindow(string $name = 'main', int $width = 400, int $height = 300): AppkitWindow
+{
+    /** @var AppkitWindow $window */
+    $window = driver()->open($name, $width, $height);
+    $window->present();
+    if (! pumpUntil(fn (): bool => $window->size() === [$width, $height])) {
+        throw new RuntimeException("Window '{$name}' was not laid out at {$width}x{$height}: ".json_encode($window->size()));
+    }
+
+    return $window;
+}
+
+/**
+ * Close every open window and drop what they posted.
+ */
+function closeAll(): void
+{
+    $windows = (fn (): array => $this->windows)->call(driver());
+    foreach ($windows as $window) {
+        $window->close();
+    }
+    pumpFor(0.05);
+    takeMail();
+}
+
+/**
+ * Mail the session is holding for a loop, taken out.
+ *
+ * @return list<object>
+ */
+function takeMail(): array
 {
     return (function (): array {
         [$mail, $this->outbox] = [$this->outbox, []];
 
         return $mail;
-    })->call($session);
-}
-
-/** The primitives' own mail the session is holding, taken out; window and menu mail is dropped. */
-function viewMail(AppkitSession $session): array
-{
-    return array_values(array_filter(takeMail($session), fn (object $mail): bool => $mail instanceof PrimitiveMail));
+    })->call(session());
 }
 
 /**
- * Pump until the window is on screen and two pumps in a row see the same clip bounds and
- * document frame: the window's first layout has landed, so what follows is the test's own.
+ * @param list<object> $mail
+ * @return list<string>
  */
-function settled(AppkitWindow $window, AppkitTextArea $area, float $seconds = 3.0): bool
+function mailNames(array $mail): array
 {
-    $last = null;
-
-    return pumpUntil(function () use ($window, $area, &$last): bool {
-        $bounds = $area->native()->contentView()->bounds();
-        $document = $area->native()->documentView()->frame();
-        $now = [$bounds->x, $bounds->y, $bounds->width, $bounds->height, $document->width, $document->height];
-        $settled = $window->native()->isVisible() && $bounds->height > 0.0 && $now === $last;
-        $last = $now;
-
-        return $settled;
-    }, $seconds);
+    return array_map(static fn (object $m): string => (new ReflectionClass($m))->getShortName(), $mail);
 }
 
-/** Pump AppKit for $seconds through the real sleeper, which flushes latest mail after each pump as the loop does. */
+/**
+ * How many of $mail are $type for the window $name.
+ *
+ * @param list<object> $mail
+ */
+function countMail(array $mail, string $type, string $name): int
+{
+    return count(array_filter($mail, fn (object $m): bool => (new ReflectionClass($m))->getShortName() === $type && $m->window === $name));
+}
+
+/**
+ * Pump, collecting mail, until mail of the short class name $type arrives or $seconds pass.
+ *
+ * @return list<object> everything collected
+ */
+function mailUntil(string $type, float $seconds = 2.0): array
+{
+    $mail = [];
+    pumpUntil(function () use (&$mail, $type): bool {
+        array_push($mail, ...takeMail());
+
+        return in_array($type, mailNames($mail), true);
+    }, $seconds);
+
+    return $mail;
+}
+
+/**
+ * Pump through the loop's own sleeper, which sends latest-only mail after each pump.
+ */
 function pumpFor(float $seconds): void
 {
     $pump = new ToolkitPump(session());
@@ -156,276 +162,71 @@ function pumpFor(float $seconds): void
     }
 }
 
-/** Pump through the real sleeper until $until() holds or $seconds pass; whether it held. */
-function pumpUntil(callable $until, float $seconds): bool
+/**
+ * Pump until $done() holds or $seconds pass; say whether it held.
+ */
+function pumpUntil(Closure $done, float $seconds = 2.0): bool
 {
     $pump = new ToolkitPump(session());
-    $limit = microtime(true) + $seconds;
-    while (! $until()) {
-        if (microtime(true) >= $limit) {
-            return false;
-        }
+    $until = microtime(true) + $seconds;
+    while (! $done() && microtime(true) < $until) {
         $pump->sleep(10_000_000);
     }
 
-    return true;
-}
-
-/** Perform a built item as if the user chose it. */
-function choose(NSMenuItem $item): void
-{
-    $menu = $item->menu();
-    $menu->performActionForItemAtIndex($menu->indexOfItem($item));
-}
-
-/** A borrower that keeps what it was asked to present into; its framebuffer is a plain dirty one. */
-final class LayerBorrower implements SurfaceBorrower
-{
-    /** @var list<LentSurface> */
-    public array $presented = [];
-
-    public Framebuffer $frame;
-
-    public function __construct()
-    {
-        $this->frame = new NativeDirtyFramebuffer(FormatSpec::rgba8(), 8, 8);
-    }
-
-    public function framebuffer(): Framebuffer
-    {
-        return $this->frame;
-    }
-
-    public function lendingHandles(): array
-    {
-        return [];
-    }
-
-    public function presentInto(LentSurface $surface): bool
-    {
-        $this->presented[] = $surface;
-
-        return true;
-    }
-}
-
-/** A frame an hour long: within a test only reads end it. */
-function inputFrame(): InputFrame
-{
-    return new InputFrame(fn (): int => 3_600_000_000_000);
+    return $done();
 }
 
 /**
- * A staged window on screen for input tests, its centre found by the window-at-point lookup
- * (a window not yet on screen is not found, measured). $x and $y place it, so two do not overlap.
- */
-function inputWindow(string $name = 'keys', int $x = 120, int $y = 160): AppkitStagedWindow
-{
-    driver()->getStaged($name)?->close();
-    $window = driver()->openStaged($name, 320, 200, ['x' => $x, 'y' => $y]);
-    $number = $window->native()->windowNumber();
-    pumpUntil(fn (): bool => NSWindow::windowNumberAtPointBelowWindowWithWindowNumber(screenPoint($window, 160.0, 100.0), 0) === $number, 5.0)
-        || throw new RuntimeException("Staged window '{$name}' never came on screen.");
-
-    return $window;
-}
-
-/** The AppKit screen point (origin bottom left of the main screen) of ($x, $y) in $window's content, measured from its top left. */
-function screenPoint(AppkitStagedWindow $window, float $x, float $y): NSPoint
-{
-    $native = $window->native();
-    $content = $native->contentRectForFrameRect($native->frame());
-
-    return new NSPoint($content->x + $x, $content->y + $content->height - $y);
-}
-
-/** The Quartz point (origin top left of the main screen) of an AppKit screen point. */
-function quartzPoint(NSPoint $point): NSPoint
-{
-    return new NSPoint($point->x, NSScreen::screens()[0]->frame()->height - $point->y);
-}
-
-function keyEvent(AppkitStagedWindow $window, int $code, bool $down, string $characters = '', int $flags = 0, bool $repeat = false): NSEvent
-{
-    return NSEvent::keyEventWithTypeLocationModifierFlagsTimestampWindowNumberContextCharactersCharactersIgnoringModifiersIsARepeatKeyCode(
-        $down ? NSEventType::KEY_DOWN : NSEventType::KEY_UP, new NSPoint(0.0, 0.0), $flags, 0.0, $window->native()->windowNumber(), null, $characters, $characters, $repeat, $code,
-    );
-}
-
-function flagsEvent(AppkitStagedWindow $window, int $code, int $flags): NSEvent
-{
-    return NSEvent::keyEventWithTypeLocationModifierFlagsTimestampWindowNumberContextCharactersCharactersIgnoringModifiersIsARepeatKeyCode(
-        NSEventType::FLAGS_CHANGED, new NSPoint(0.0, 0.0), $flags, 0.0, $window->native()->windowNumber(), null, '', '', false, $code,
-    );
-}
-
-/** A left or right click event at ($x, $y) of $window's content, from its top left. */
-function clickEvent(AppkitStagedWindow $window, NSEventType $type, float $x, float $y): NSEvent
-{
-    $frame = $window->native()->frame();
-    $at = screenPoint($window, $x, $y);
-
-    return NSEvent::mouseEventWithTypeLocationModifierFlagsTimestampWindowNumberContextEventNumberClickCountPressure(
-        $type, new NSPoint($at->x - $frame->x, $at->y - $frame->y), 0, 0.0, $window->native()->windowNumber(), null, 0, 1, 1.0,
-    );
-}
-
-/** An other-button event (2 middle, 3 and 4 the side buttons) at a screen point: AppKit has no constructor that sets the button. */
-function otherButtonEvent(NSPoint $at, int $button, bool $down): NSEvent
-{
-    $quartz = CGEvent::createMouseEvent(null, $down ? CGEventType::OTHER_MOUSE_DOWN : CGEventType::OTHER_MOUSE_UP, quartzPoint($at), CGMouseButton::CENTER);
-    $quartz->setIntegerValueField(kCGMouseEventButtonNumber, $button);
-
-    return NSEvent::eventWithCGEvent($quartz);
-}
-
-/** A moved event at a screen point with motion deltas: window number 0, as a CGEvent's is. */
-function moveEvent(NSPoint $at, int $dx = 0, int $dy = 0): NSEvent
-{
-    $quartz = CGEvent::createMouseEvent(null, CGEventType::MOUSE_MOVED, quartzPoint($at), CGMouseButton::LEFT);
-    $quartz->setIntegerValueField(kCGMouseEventDeltaX, $dx);
-    $quartz->setIntegerValueField(kCGMouseEventDeltaY, $dy);
-
-    return NSEvent::eventWithCGEvent($quartz);
-}
-
-/** A scroll at a screen point: $vertical and $horizontal in lines or pixels. */
-function scrollEvent(NSPoint $at, CGScrollEventUnit $units, int $vertical, int $horizontal = 0): NSEvent
-{
-    $quartz = CGEvent::createScrollWheelEvent2(null, $units, 2, $vertical, $horizontal, 0);
-    $quartz->setLocation(quartzPoint($at));
-
-    return NSEvent::eventWithCGEvent($quartz);
-}
-
-/**
- * An appkit input engine on the shared driver's connected session, let go by letGoOfInput().
- * The pointer rests where $pointer says (far off every screen unless given), and every button and
- * key the engine saw go down stays held unless $buttons and $keys say otherwise, so the real
- * pointer, mouse and keyboard never decide a test.
+ * Pump until the native window is the active one, collecting mail. macOS activation is
+ * cooperative: while the user works in another app the system may decline it, and no API
+ * forces it. There the test is skipped; elsewhere activation must happen.
  *
- * @param (Closure(): NSPoint)|null $pointer
- * @param (Closure(): int)|null $buttons the pressed-buttons mask
- * @param (Closure(int): bool)|null $keys whether a key code is down
+ * @return list<object> the mail collected
  */
-function appkitInput(?Closure $pointer = null, ?Closure $buttons = null, ?Closure $keys = null): AppkitInputEngine
+function requireActive(AppkitWindow $window): array
 {
-    session();
-    $engine = new AppkitInputEngine(
-        inputFrame(),
-        driver(),
-        $pointer ?? fn (): NSPoint => new NSPoint(-20_000.0, -20_000.0),
-        $buttons ?? fn (): int => 0b11111,
-        $keys ?? fn (int $code): bool => true,
-    );
-    $GLOBALS['appkit_input_engines'][] = $engine;
+    $mail = [];
+    $active = pumpUntil(function () use ($window, &$mail): bool {
+        array_push($mail, ...takeMail());
 
-    return $engine->connect();
-}
-
-/** Disconnects every engine appkitInput() made: their taps and observers leave. */
-function letGoOfInput(): void
-{
-    foreach ($GLOBALS['appkit_input_engines'] ?? [] as $engine) {
-        $engine->disconnect();
-    }
-    $GLOBALS['appkit_input_engines'] = [];
-}
-
-/** Posts the events, pumps the session once as the loop's poller does, and polls the engine. */
-function deliver(AppkitInputEngine $engine, NSEvent ...$events): void
-{
-    $session = session();
-    $session->pump(0);
-    foreach ($events as $event) {
-        $session->application()->postEventAtStart($event, false);
-    }
-    $session->pump(0);
-    $engine->poll();
-}
-
-/**
- * The descriptor number behind a stream, for CFFileDescriptor::create(): the /dev/fd entry
- * with the stream's inode and mode (a socket's fstat() device is -1, so the device is not compared).
- *
- * @param resource $stream
- */
-function streamDescriptor($stream): int
-{
-    $want = fstat($stream);
-    foreach (scandir('/dev/fd') as $entry) {
-        // The listing's own descriptor is closed by now: file_exists() skips it without a warning.
-        if (! ctype_digit($entry) || ! file_exists('/dev/fd/'.$entry)) {
-            continue;
-        }
-        $stat = stat('/dev/fd/'.$entry);
-        if ($stat !== false && $stat['ino'] === $want['ino'] && $stat['mode'] === $want['mode']) {
-            return (int) $entry;
-        }
-    }
-
-    throw new RuntimeException('No /dev/fd entry matches the stream');
-}
-
-/** The window (base) point of ($x, $y) measured from $view's top-left, once laid out. */
-function canvasWindowPoint(AppkitWindow $window, NSView $view, float $x, float $y): NSPoint
-{
-    $window->present();
-    pumpUntil(fn (): bool => $view->bounds()->width > 0.0, 3.0);
-    // window → view is a translation, with y turned round when the view is flipped: invert it.
-    $origin = $view->convertPointFromView(new NSPoint(0.0, 0.0), null);
-    $sign = $view->convertPointFromView(new NSPoint(0.0, 1.0), null)->y - $origin->y;
-    $ly = $view->isFlipped() ? $y : $view->bounds()->height - $y;
-
-    return new NSPoint($x - $origin->x, ($ly - $origin->y) / $sign);
-}
-
-function mouseAt(AppkitWindow $window, NSPoint $at, NSEventType $type, int $flags = 0, int $clicks = 1): NSEvent
-{
-    return NSEvent::mouseEventWithTypeLocationModifierFlagsTimestampWindowNumberContextEventNumberClickCountPressure(
-        $type, $at, $flags, 0.0, $window->native()->windowNumber(), null, 0, $clicks, 1.0,
-    );
-}
-
-/**
- * Run $inside once while a menu tracks: a menu tracks in its own run loop mode, and a source in the
- * common modes runs inside it. The returned closure takes the source off.
- */
-function whileTracking(Closure $inside): Closure
-{
-    [$read, $write] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
-    $descriptor = CFFileDescriptor::create(null, streamDescriptor($read), false, function () use ($inside): void {
-        $inside();
+        return nativeActive($window);
     });
-    $source = $descriptor->createRunLoopSource(null, 0);
-    CFRunLoop::getMain()->addSource($source, kCFRunLoopCommonModes);
-    $descriptor->enableCallBacks(kCFFileDescriptorReadCallBack);
-    fwrite($write, 'x');
+    if (! $active) {
+        if (PHP_OS_FAMILY === 'Darwin') {
+            test()->markTestSkipped('macOS declined to activate the app: another app holds focus.');
+        }
+        throw new RuntimeException("Window '{$window->name()}' did not become active.");
+    }
+    pumpFor(0.1);
+    array_push($mail, ...takeMail());
 
-    return function () use ($descriptor, $source, $read, $write): void {
-        CFRunLoop::getMain()->removeSource($source, kCFRunLoopCommonModes);
-        $descriptor->invalidate();
-        fclose($write);
-        fclose($read);
-    };
+    return $mail;
 }
 
-/** A key-down event made from a Quartz event, as a key press is: AppKit matches Shift exactly only for one of these. */
-function keyDown(int $virtualKey, int $flags): NSEvent
+/** The user's close, as the window system sends it. */
+function nativeUserClose(AppkitWindow $window): void
 {
-    $event = CGEvent::createKeyboardEvent(null, $virtualKey, true);
-    $event->setFlags($flags);
-
-    return NSEvent::eventWithCGEvent($event);
+    $window->native()->performClose(null);
 }
 
-/** A key press, down then up, made from Quartz events, queued at the end and pumped through the session as the user's. */
-function press(int $code, int $flags = 0): void
+/** Resize the native window from code, as the window system would. */
+function nativeResize(AppkitWindow $window, int $width, int $height): void
 {
-    $app = NSApplication::sharedApplication();
-    $up = CGEvent::createKeyboardEvent(null, $code, false);
-    $up->setFlags($flags);
-    $app->postEventAtStart(keyDown($code, $flags), false);
-    $app->postEventAtStart(NSEvent::eventWithCGEvent($up), false);
-    pumpFor(0.15);
+    $window->native()->setContentSize(new NSSize((float) $width, (float) $height));
+}
+
+function nativeTitle(AppkitWindow $window): string
+{
+    return $window->native()->title();
+}
+
+function nativeActive(AppkitWindow $window): bool
+{
+    return $window->native()->isKeyWindow();
+}
+
+/** Whether a native window is still shown: a closed one is not. */
+function nativeShown(object $native): bool
+{
+    return $native->isVisible();
 }

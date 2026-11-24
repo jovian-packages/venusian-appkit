@@ -5,7 +5,7 @@ description: Pest suite against the real toolkit in a workbench of path repos; m
 resource: tests/
 tags: [appkit, pest]
 status: draft
-generated: { by: claude-opus/5.5, at: 2026-10-02T22:38:01Z }
+generated: { by: claude-opus/5.5, at: 2026-11-22T20:28:54Z }
 sources:
   - id: pest
     resource: tests/Pest.php
@@ -14,7 +14,7 @@ sources:
 
 # Overview
 
-Suite drives the real toolkit: windows appear on screen. One driver per process (one application per process), built in `tests/Pest.php` with a `ControlPanel` container holding `config`, `toolkit-bridge`, `toolkit-windows`; helpers `driver()`, `session()`, `takeMail()` (empties the outbox), `pumpFor($seconds)` and `pumpUntil($condition, $seconds)`, both through the real sleeper (`ToolkitPump::sleep`, which flushes latest mail per pump as the loop does).[^pest]
+`--testsuite=Windowless` puts nothing on screen: the application is never activated and no window presented. The Integration suite drives the real toolkit: windows appear on screen. One driver per process (one application per process), built in `tests/Pest.php` with a `ControlPanel` container holding `config`, `toolkit-bridge`, `toolkit-windows`; helpers `driver()`, `session()`, `takeMail()` (empties the outbox), `pumpFor($seconds)` and `pumpUntil($condition, $seconds)`, both through the real sleeper (`ToolkitPump::sleep`, which flushes latest mail per pump as the loop does).[^pest]
 
 Covers: session lifecycle, budgeted wait, loop join (kqueue/epoll fd ends the toolkit sleep), open/close/focus mail, menu build, item/toggle/quit mail, About, default bar, profile swap; primitives (`tests/Primitives/`): containers and layout, every leaf's native state and mail, resize mail, table, video (`tests/fixtures/clip.mp4`, 1 s 64×64 H.264).
 

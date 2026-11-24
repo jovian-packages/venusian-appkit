@@ -6,6 +6,8 @@ AppKit toolkit driver for the Venusian Surface bridge.
 
 `AppkitCanvas` shows a `TKCanvas`'s framebuffer as the contents of a layer-backed view: the RGBA8 bytes become a `CGImage` (sRGB, the fourth byte skipped, so opaque), stretched over the view's bounds.
 
+A GPU engine reaches the same view through `nativeHandle()`: kind `appkit.view`, the canvas's `NSView` itself. The canvas keeps the view. A presenter adds its own child and takes that child away.
+
 An ext-fb framebuffer is piped. `present()` hands the framebuffer's memory to `CFData::create` by address, and Core Graphics copies what it needs. No pixel byte passes through PHP. A framebuffer held in PHP (the native driver) takes the same path from a string.
 
 A GPU engine borrows the view's layer instead. With ext-metal loaded, `surfaces()` is `[METAL_LAYER]`: the canvas lends a `CAMetalLayer` (ext-metal) as the view's layer to the `metal` engine (jovian/venusian-metal), whose frames reach the window with no pixel through PHP. The `vulkan` engine (jovian/venusian-vulkan, with ext-vulkan) presents through the same layer: it makes a `VkSurfaceKHR` over it with `vkCreateMetalSurfaceEXT` (MoltenVK) and swaps into it; `renderer('vulkan', ['output' => $canvas])`. `reclaim()` restores a backing layer with gravity and clipping, and the canvas shows its own framebuffer again.

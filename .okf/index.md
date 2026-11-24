@@ -4,12 +4,19 @@ okf_version: "0.2"
 
 # jovian/venusian-appkit
 
-* [Session](architecture/session.md) - NSApplication session: launch once, Dock presence on connect, event pump with budget, CFFileDescriptor wake.
-* [Windows and menus](architecture/windows-and-menus.md) - NSWindow per name, delegate mail, content container and resize mail, one app-wide NSMenu bar, default bar, About panel.
-* [Staged windows](architecture/staged-windows.md) - AppkitStagedWindow: ObjCStageWindow + ObjCDrawView, partial present, Spaces and exclusive fullscreen, displays, capabilities, lending.
-* [Primitives](architecture/primitives.md) - Factory, shared native trait, stack/grid/fixed/scroll containers over Auto Layout, every leaf, layout model, mail.
-* [Input](architecture/input.md) - AppkitInputEngine taps the session, reads keys by position, the pointer under any window, the wheel as SDL; GameControllerPadSource lists gc- pads, follows focus or refuses where macOS keeps pads from a background process.
+* [Session](architecture/session.md) - NSApplication launched once, Dock presence while connected, an event pump with a budget, and a CFFileDescriptor wake.
+* [Window](architecture/window.md) - An ObjCKeyWindow with an NSWindowDelegate wired to Topside's window lifecycle; resizes and backing-scale changes from the delegate.
+* [Menu bar](architecture/menu-bar.md) - One NSMenu per window and one for none key: natives, enabled state, bare keys, and what macOS adds.
+* [UI primitives](architecture/ui-primitives.md) - The AppKit column, row, fixed, label and button on Topside's TK classes, and the native widget each one is.
+* [Enabled cascade](architecture/enabled-cascade.md) - AppKit has no enabled state on a view, so this package carries a container's disabled state down to the controls inside it.
 
 # Runbooks
 
 * [Testing](runbooks/testing.md) - Pest suite against the real toolkit in a workbench of path repos; macOS only.
+
+# Deprecated
+
+* [Windows and menus](architecture/windows-and-menus.md) - the bridge-era window, menu bar, focus and keys (deprecated2/).
+* [Staged windows](architecture/staged-windows.md) - AppkitStagedWindow (deprecated/Windows/).
+* [Primitives](architecture/primitives.md) - the bridge-era AppKit primitives (deprecated2/Primitives/).
+* [Input](architecture/input.md) - AppkitInputEngine and GameControllerPadSource (deprecated/, deprecated2/).

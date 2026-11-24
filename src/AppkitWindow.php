@@ -2,46 +2,37 @@
 
 namespace Jovian\Toolkits\Appkit;
 
-use Jovian\Toolkits\Appkit\Primitives\AppkitPrimitiveFactory;
-use Jovian\Toolkits\Appkit\Windows\AppkitMenuBar;
-use NSLayoutConstraint;
 use NSBackingStoreType;
+use NSLayoutConstraint;
 use NSRect;
 use NSWindow;
 use NSWindowStyleMask;
 use ObjCDelegate;
 use ObjCKeyWindow;
-use Surface\Toolkits\Windows\ChildWindows;
-use WeakReference;
-use Surface\Toolkits\Windows\ToolkitWindow;
-use Jovian\Toolkits\Appkit\Windows\AppkitFocus;
-use Surface\Contracts\Toolkits\Menus\MenuProfile;
-use Surface\Contracts\Toolkits\Primitives\PrimitiveFactory;
-use Surface\Contracts\Toolkits\Primitives\TKPrimitive;
-use Surface\Contracts\Toolkits\ToolkitRuntimeException;
-use Surface\Contracts\Toolkits\Mail\Windows\WindowClosed;
+use RuntimeException;
 use Surface\Contracts\Toolkits\Mail\Windows\WindowFocused;
-use Surface\Contracts\Toolkits\Mail\Windows\WindowResized;
 use Surface\Contracts\Toolkits\Mail\Windows\WindowScaleChanged;
-use Surface\Contracts\Toolkits\Mail\Windows\WindowCloseRequested;
-use Surface\Contracts\Toolkits\Primitives\TKPrimitiveGroup;
+use Surface\Toolkits\ToolkitWindow;
+use Surface\Contracts\Toolkits\UI\TKColumn as ColumnContract;
 
 class AppkitWindow extends ToolkitWindow
 {
+    protected bool $key = false;
+
     /**
      * The native window while open; null once closed.
      * @var ObjCKeyWindow|null
      */
     protected ?NSWindow $window = null;
 
-    protected bool $key = false;
+    /**
+     * Hears the window's key and close notifications. AppKit holds delegates weakly: kept here.
+     * @var ObjCDelegate|null
+     */
+    protected ?ObjCDelegate $delegate = null;
 
     /** The window's focus as primitives: compared after each event the session's pump takes. */
-    protected ?AppkitFocus $focus = null;
-
-    protected bool $confirming = false;
-
-    protected ?PrimitiveFactory $factory = null;
+    //protected ?AppkitFocus $focus = null;
 
     /**
      * The four edges pinning the content container to the content view.
@@ -49,68 +40,35 @@ class AppkitWindow extends ToolkitWindow
      */
     protected array $content_constraints = [];
 
-    /** The backing scale last posted, or seen at open. */
-    private float $backing_scale;
-
-    /**
-     * This window's bar, installed as the app's bar while the window is key.
-     * @var AppkitMenuBar|null
-     */
-    protected ?AppkitMenuBar $menu = null;
-
-    /**
-     * Hears the window's key and close notifications. AppKit holds delegates weakly: kept here.
-     * @var ObjCDelegate
-     */
-    protected ObjCDelegate $delegate;
-
     /**
      * A child: whether its sheet began on the parent.
      */
     protected bool $sheet_begun = false;
 
-    /** @var WeakReference<TKPrimitive>|null focused on each present(); weak, so a removed primitive is freed */
-    protected ?WeakReference $initial_focus = null;
+    /** The backing scale last posted, or seen at open. */
+    private ?float $backing_scale = null;
 
     public function __construct(
-        protected readonly string $name,
-        protected readonly AppkitSession $session,
-        protected readonly AppkitBridge $driver,
+        string $name,
+        AppkitSession $session,
+        AppkitAdapterDriver $driver,
         int $width,
         int $height,
-        ?MenuProfile $menu,
-        protected readonly ?ToolkitWindow $parent = null,
+        ?AppkitWindow $parent = null,
     ) {
-        $this->bootstrapWindow($width, $height);
-
-        if (! is_null($menu)) {
-            $this->menu = new AppkitMenuBar($session, $menu, $name, $driver->about());
-        }
-    }
-
-    public function name(): string
-    {
-        return $this->name;
+        parent::__construct($name, $session, $driver, $width, $height, $parent);
     }
 
     /**
-     * AppKit runs windowWillClose: inside close, so the mail and bookkeeping happen there,
-     * the same path as the user's close button. The child closes first; a child ends its sheet
-     * first. NSWindow::close() does not ask windowShouldClose:, so a confirming window closes too.
-     * @return void
+     * The content area in points: what the content container is laid out in.
+     * @return array{int, int}
+     * @throws RuntimeException Once closed.
      */
-    public function close(): void
+    public function size(): array
     {
-        if (is_null($this->window)) {
-            return;
-        }
-        ChildWindows::childOf($this->driver, $this)?->close();
-        $this->driver->dialogs()->closeOn($this);
-        if ($this->sheet_begun && $this->parent instanceof self && $this->parent->isOpen())
-        {
-            $this->parent->native()->endSheet($this->window);
-        }
-        $this->window?->close();
+        $frame = $this->live()->contentView()->frame();
+
+        return [(int) round($frame->width), (int) round($frame->height)];
     }
 
     public function isOpen(): bool
@@ -118,18 +76,19 @@ class AppkitWindow extends ToolkitWindow
         return ! is_null($this->window);
     }
 
-    public function title(): string
+    /**
+     * The native window, for engines that draw into it.
+     * @throws RuntimeException Once closed.
+     */
+    public function native(): NSWindow
     {
-        return $this->live()->title();
+        return $this->live();
     }
 
     public function present(): static
     {
         $window = $this->live();
-        $initial = $this->initial_focus?->get();
-        $initial = ! is_null($initial) && ! $initial->isRemoved() && method_exists($initial, 'focusView') ? $initial->focusView() : null;
-        $window->setInitialFirstResponder($initial);
-        $show = function () use ($window, $initial): void {
+        $show = function () use ($window): void {
             if ($this->parent instanceof self) {
                 $parent = $this->parent->native();
                 if (! $parent->isVisible()) {
@@ -143,25 +102,13 @@ class AppkitWindow extends ToolkitWindow
                 }
             }
 
-            $this->session->application()->activateIgnoringOtherApps(true);
+            $this->session->application()->get()->activateIgnoringOtherApps(true);
             $window->makeKeyAndOrderFront(null);
-
-            // AppKit may have made it first responder already: again would end its editing and select it anew.
-            if (! is_null($initial) && $this->focused() !== $this->initial_focus?->get()) {
-                $window->makeFirstResponder($initial);
-            }
+            $this->focusInitial();
         };
 
-        // With the focus tracker, showing posts no focus mail.
-        is_null($this->focus) ? $show() : $this->focus->quietly($show);
-        $this->focus?->presented();
-
+        $show();
         return $this;
-    }
-
-    public function isToggled(string $item): bool
-    {
-        return $this->menuOrFail()->isToggled($item);
     }
 
     public function setTitle(string $title): static
@@ -171,210 +118,9 @@ class AppkitWindow extends ToolkitWindow
         return $this;
     }
 
-    public function setMenuBar(string $profile): static
-    {
-        $this->live();
-        ChildWindows::refuseMenuBar($this);
-        $this->menu = new AppkitMenuBar($this->session, $this->driver->profile($profile), $this->name, $this->driver->about());
-
-        if ($this->key) {
-            $this->menu->install();
-        }
-
-        return $this;
-    }
-
-    public function setToggle(string $item, bool $on): static
-    {
-        $this->menuOrFail()->setToggle($item, $on);
-
-        return $this;
-    }
-
-    public function setItemEnabled(string $item, bool $enabled): static
-    {
-        $this->menuOrFail()->setItemEnabled($item, $enabled);
-
-        return $this;
-    }
-
-    public function isItemEnabled(string $item): bool
-    {
-        return $this->menuOrFail()->isItemEnabled($item);
-    }
-
-    public function setRadio(string $group, string $item): static
-    {
-        $this->menuOrFail()->setRadio($group, $item);
-
-        return $this;
-    }
-
-    public function radio(string $group): string
-    {
-        return $this->menuOrFail()->radio($group);
-    }
-
-    public function setItemLabel(string $item, string $label): static
-    {
-        $this->menuOrFail()->setItemLabel($item, $label);
-
-        return $this;
-    }
-
-    public function itemLabel(string $item): string
-    {
-        return $this->menuOrFail()->itemLabel($item);
-    }
-
-    public function parent(): ?ToolkitWindow
-    {
-        return $this->parent;
-    }
-
-    public function confirmClose(bool $on = true): static
-    {
-        $this->confirming = $on;
-
-        return $this;
-    }
-
-    public function isConfirmingClose(): bool
-    {
-        return $this->confirming;
-    }
-
-    public function focused(): ?TKPrimitive
-    {
-        return $this->focus?->holder();
-    }
-
-    public function setInitialFocus(?TKPrimitive $primitive): static
-    {
-        if (! is_null($primitive) && $primitive->window() !== $this) {
-            throw new ToolkitRuntimeException("'{$primitive->path()}' is not in window '{$this->name}'.");
-        }
-        $this->initial_focus = is_null($primitive) ? null : WeakReference::create($primitive);
-
-        return $this;
-    }
-
-    /**
-     * The content area in points: what the content container is laid out in.
-     * @return array{int, int}
-     * @throws ToolkitRuntimeException Once closed.
-     */
-    public function size(): array
-    {
-        $frame = $this->live()->contentView()->frame();
-
-        return [(int) round($frame->width), (int) round($frame->height)];
-    }
-
-    /**
-     * This window's minter, one per window. Typed as the contract so the window loads before
-     * AppkitPrimitiveFactory is re-pointed at topside; narrow it back to the concrete after.
-     */
-    public function factory(): PrimitiveFactory
-    {
-        return $this->factory ??= new AppkitPrimitiveFactory($this);
-    }
-
-    /**
-     * The session primitives post their mail through.
-     */
-    public function session(): AppkitSession
-    {
-        return $this->session;
-    }
-
-    /**
-     * Run a focus move that code makes, so the focus tracker posts no mail for it. Without a
-     * tracker (input routing is not ported yet) the move runs as it is.
-     */
-    public function quietly(\Closure $move): void
-    {
-        is_null($this->focus) ? $move() : $this->focus->quietly($move);
-    }
-
-    /** The window's focus as primitives; primitives move focus through it. Detached once the window closes. */
-    public function focusTracker(): ?AppkitFocus
-    {
-        return $this->focus;
-    }
-
-    /**
-     * This window's bar, or null when it has none.
-     */
-    public function menuBar(): ?AppkitMenuBar
-    {
-        return $this->menu;
-    }
-
-    /**
-     * Whether this window is key, and so whose bar the app shows.
-     */
-    public function isKey(): bool
-    {
-        return $this->key;
-    }
-
-    /**
-     * Whether a sheet (a child window, an alert, a file panel) is attached: AppKit then drops the
-     * window's own mouse events.
-     */
-    public function hasSheet(): bool
-    {
-        return ! is_null($this->native()->attachedSheet());
-    }
-
-    /**
-     * The user's close: the close button (windowShouldClose:), or Esc in a child with no cancel
-     * button. While confirming, WindowCloseRequested and the window stays open.
-     */
-    public function userClose(): void
-    {
-        if ($this->shouldClose()) {
-            $this->close();
-        }
-    }
-
-    /**
-     * Pin the content container's placed view to the four edges of the content view.
-     */
-    protected function mountContent(TKPrimitiveGroup $content): void
-    {
-        $view = $content->placedView();
-        $area = $this->live()->contentView();
-        $area->addSubview($view);
-        $this->content_constraints = [
-            $view->leadingAnchor()->constraintEqualToAnchor($area->leadingAnchor()),
-            $view->trailingAnchor()->constraintEqualToAnchor($area->trailingAnchor()),
-            $view->topAnchor()->constraintEqualToAnchor($area->topAnchor()),
-            $view->bottomAnchor()->constraintEqualToAnchor($area->bottomAnchor()),
-        ];
-        NSLayoutConstraint::activateConstraints($this->content_constraints);
-        $content->syncNativeEnabled();
-    }
-
-    /**
-     * The native window, for engines that draw into it.
-     * @return NSWindow
-     * @throws ToolkitRuntimeException Once closed.
-     */
-    public function native(): NSWindow
-    {
-        return $this->live();
-    }
-
     protected function live(): NSWindow
     {
-        return $this->window ?? throw new ToolkitRuntimeException("Window '{$this->name}' is closed.");
-    }
-
-    protected function menuOrFail(): AppkitMenuBar
-    {
-        return $this->menu ?? throw new ToolkitRuntimeException("Window '{$this->name}' has no menu bar.");
+        return $this->window ?? throw new RuntimeException("Window '{$this->name}' is closed.");
     }
 
     protected function bootstrapWindow(int $width, int $height): void
@@ -400,12 +146,12 @@ class AppkitWindow extends ToolkitWindow
         $this->delegate->on('windowDidResignKey:', fn () => $this->resignedKey());
         $this->delegate->on('windowShouldClose:', fn (): bool => $this->shouldClose());
         $this->delegate->on('windowWillClose:', fn () => $this->closed());
-        $this->delegate->on('windowDidResize:', fn () => $this->resized());
+        $this->delegate->on('windowDidResize:', fn () => $this->didResize());
         $this->delegate->on('windowDidChangeBackingProperties:', fn () => $this->backingChanged());
         $this->backing_scale = $this->window->backingScaleFactor();
         $this->window->setDelegate($this->delegate);
 
-        $this->focus = new AppkitFocus($this, $this->window, $this->session);
+        //$this->focus = new AppkitFocus($this, $this->window, $this->session);
 
         // Not ported yet (deprecated/Windows): the right-click, group-click, button-key and window-key
         // taps. A canvas's clicks, pointer, hover and keys are its input now (topside HumanInput).
@@ -414,14 +160,13 @@ class AppkitWindow extends ToolkitWindow
     protected function becameKey(): void
     {
         $this->key = true;
-        $this->focus?->becameKey();
+        //$this->focus?->becameKey();
         // AppKit has no pasteboard notification: another app's copy shows when the app comes back.
-        $this->driver->clipboard()->compare();
+        //$this->adapter->clipboard()->compare();
 
-        // The per-window swap: AppKit has one main menu and does not change it by itself.
-        // Not ported yet: what the bar shows for a child, or a window with no menu. It was the
-        // driver's default bar (installDefaultMenuBar), which is the part being rethought.
-        $this->menu?->install();
+        // AppKit has one main menu and does not change it by itself. Here and not from mail: a
+        // shortcut is matched against whichever bar is installed at that instant.
+        $this->gainedFocus();
 
         $this->session->post(new WindowFocused($this->name));
     }
@@ -429,18 +174,15 @@ class AppkitWindow extends ToolkitWindow
     protected function resignedKey(): void
     {
         $this->key = false;
-        // The next key window installs its own bar right after. Not ported yet: what shows when
-        // none does (was $this->driver->showDefaultMenuBar()).
+        // The default bar, until a window's becameKey() shows that window's.
+        $this->lostFocus();
     }
 
-    /**
-     * Live resizes collapse to the last size per pump.
-     * @return void
-     */
-    protected function resized(): void
+    /** The delegate's windowDidResize: the content area's new size. */
+    protected function didResize(): void
     {
         [$width, $height] = $this->size();
-        $this->session->postLatest("window.resized.{$this->name}", new WindowResized($this->name, $width, $height));
+        $this->resized($width, $height);
     }
 
     /**
@@ -458,41 +200,61 @@ class AppkitWindow extends ToolkitWindow
     }
 
     /**
-     * The one close path, while the native window still lives: the content tree goes first,
-     * then any resize not yet flushed, then the window is gone, posted and forgotten.
-     * @return void
+     * The content container's view fills the content view: pinned to its four edges.
      */
-    protected function closed(): void
+    protected function mountContent(ColumnContract $content): void
     {
-        if (is_null($this->window)) {
-            return;
-        }
+        $view = $content->native();
+        $area = $this->live()->contentView();
+        $view->setTranslatesAutoresizingMaskIntoConstraints(false);
+        $area->addSubview($view);
 
-        $this->focus?->detach();
-        $this->removeContent();
+        $this->content_constraints = [
+            $view->leadingAnchor()->constraintEqualToAnchor($area->leadingAnchor()),
+            $view->trailingAnchor()->constraintEqualToAnchor($area->trailingAnchor()),
+            $view->topAnchor()->constraintEqualToAnchor($area->topAnchor()),
+            $view->bottomAnchor()->constraintEqualToAnchor($area->bottomAnchor()),
+        ];
+        NSLayoutConstraint::activateConstraints($this->content_constraints);
+    }
+
+    /**
+     * Its pins go, and the view leaves the content view.
+     */
+    protected function unmountContent(ColumnContract $content): void
+    {
+        NSLayoutConstraint::deactivateConstraints($this->content_constraints);
         $this->content_constraints = [];
-        $this->session->forgetLatest("window.resized.{$this->name}");
+        $content->native()->removeFromSuperview();
+    }
+
+    /**
+     * AppKit's close sends windowWillClose:, which takes the close path. It skips
+     * windowShouldClose:, so a confirming window closes too.
+     */
+    protected function closeNative(): void
+    {
+        $this->live()->close();
+    }
+
+    protected function releaseNative(): void
+    {
+        //$this->focus?->detach();
+        $this->content_constraints = [];
         // The NSWindow can outlive this object: its delegate must not call into a window that is gone.
         $this->window->setDelegate(null);
         $this->window = null;
         $this->key = false;
-        $this->session->post(new WindowClosed($this->name));
-        $this->driver->forget($this->name);
     }
 
     /** The close button: AppKit closes the window unless it confirms close; then the app decides. */
     protected function shouldClose(): bool
     {
         // A parent with an open child or dialog keeps the user's close silently: AppKit blocks it only once the sheet begins.
-        if (! is_null(ChildWindows::childOf($this->driver, $this)) || ! is_null($this->driver->dialogs()->openOn($this))) {
+        /*if (! is_null(ChildWindows::childOf($this->driver, $this)) || ! is_null($this->driver->dialogs()->openOn($this))) {
             return false;
-        }
-        if ($this->confirming) {
-            $this->session->post(new WindowCloseRequested($this->name));
+        }*/
 
-            return false;
-        }
-
-        return true;
+        return $this->allowsUserClose();
     }
 }
