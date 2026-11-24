@@ -1,205 +1,44 @@
-# jovian/venusian-appkit
+# Venusian AppKit
 
-AppKit toolkit driver for the Venusian Surface bridge.
+[![Tests](https://github.com/jovian-packages/venusian-appkit/actions/workflows/tests.yml/badge.svg)](https://github.com/jovian-packages/venusian-appkit/actions/workflows/tests.yml)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/jovian/venusian-appkit.svg)](https://packagist.org/packages/jovian/venusian-appkit)
+[![Total Downloads](https://img.shields.io/packagist/dt/jovian/venusian-appkit.svg)](https://packagist.org/packages/jovian/venusian-appkit)
+[![License](https://img.shields.io/packagist/l/jovian/venusian-appkit.svg)](LICENSE)
 
-## Canvas
+## About Venusian AppKit
 
-`AppkitCanvas` shows a `TKCanvas`'s framebuffer as the contents of a layer-backed view: the RGBA8 bytes become a `CGImage` (sRGB, the fourth byte skipped, so opaque), stretched over the view's bounds.
+> **Note:** This repository contains the AppKit toolkit driver for the Venusian framework. If you want to build an application using Venusian, visit the main [Venusian skeleton repository](https://github.com/VenusianPHP/venusian).
 
-A GPU engine reaches the same view through `nativeHandle()`: kind `appkit.view`, the canvas's `NSView` itself. The canvas keeps the view. A presenter adds its own child and takes that child away.
+Venusian AppKit is the macOS toolkit driver for Venusian Topside: it connects PHP to `NSApplication`, opens its windows, builds their menu bars and turns Topside's views into real AppKit controls through [ext-appkit](https://github.com/php-io-extensions/appkit), all in the Laravel-like syntax you already know.
 
-An ext-fb framebuffer is piped. `present()` hands the framebuffer's memory to `CFData::create` by address, and Core Graphics copies what it needs. No pixel byte passes through PHP. A framebuffer held in PHP (the native driver) takes the same path from a string.
+Want a Mac app that looks and acts like a Mac app? Write your view once with Topside and Venusian AppKit gives you the real thing: native buttons, text fields, tables, outlines, split and tab views, sheets, alerts, open and save panels, the clipboard, and a menu bar whose Edit items, accelerators and enabled states behave the way macOS users expect.
 
-A GPU engine borrows the view's layer instead. With ext-metal loaded, `surfaces()` is `[METAL_LAYER]`: the canvas lends a `CAMetalLayer` (ext-metal) as the view's layer to the `metal` engine (jovian/venusian-metal), whose frames reach the window with no pixel through PHP. The `vulkan` engine (jovian/venusian-vulkan, with ext-vulkan) presents through the same layer: it makes a `VkSurfaceKHR` over it with `vkCreateMetalSurfaceEXT` (MoltenVK) and swaps into it; `renderer('vulkan', ['output' => $canvas])`. `reclaim()` restores a backing layer with gravity and clipping, and the canvas shows its own framebuffer again.
+Need more than widgets? A canvas lends its view to Venusian's rendering engines, so Metal, OpenGL, SDL_GPU and Vulkan draw straight into your window with no pixel passing through PHP. Staged windows give a game or a visualizer a whole window of its own, with full screen and exclusive display modes. And with HumanInput installed, the keyboard, the pointer, the wheel and your game controllers read from the same app.
 
-```php
-$engine = app('drawing')->renderer('metal', ['output' => $canvas]);
-$engine->frame(fn (RenderingEngine $g) => $g->clear(Color::rgb(16, 24, 32))->fillEllipse(160, 120, 40, 40, Color::rgb(255, 128, 0)));
-$canvas->present();
-```
+Got a Mac? That's all it takes. Venusian AppKit is macOS only; on Linux, reach for `jovian/venusian-qt`, `jovian/venusian-gtk` or `jovian/venusian-raven` and keep the same views.
 
-With ext-sdl3 loaded as well, `surfaces()` is `[METAL_LAYER, SDL_WINDOW]`, and the `sdl3` engine (jovian/venusian-sdl3) draws into the canvas too. SDL wraps the canvas's window and leaves its layout alone; the swapchain view SDL_GPU makes is moved into the canvas and follows its size. The canvas starts SDL's video subsystem and never quits it. SDL's listener is taken back out of the window's responder chain, and the session gives the application an empty delegate at launch, so SDL never becomes it. After `reclaim()` the SDL window is destroyed by the session's next pump once the engine's device has let go of it.
+> **Built with AI assistance.** This package was developed LLM-assisted — not vibe-coded. Generated code was deliberately prompted and reviewed by a professional software engineer. See [AI-assisted development](#ai-assisted-development).
 
-```php
-$engine = app('drawing')->renderer('sdl3', ['output' => $canvas]);
-```
+## Learning Venusian AppKit
 
-With ext-opengl loaded the canvas lends a GL context too, last in `surfaces()`: an `NSOpenGLView` (OpenGL 4.1 core, at the backing resolution) is pinned over the canvas, and the `opengl` engine (jovian/venusian-opengl) draws in its context. `present()` marks the view for display, and its `drawRect:` copies the engine's frame into the view on the GPU. The view has its context from the start, so the canvas lends before its window is shown.
+Venusian AppKit has documentation and guides on the [Venusian website](https://venusian.projectsaturnstudios.com/docs/0.11.x/ecosystem/framework-surface-modules/venusian-appkit/overview), starting with the [overview](https://venusian.projectsaturnstudios.com/docs/0.11.x/ecosystem/framework-surface-modules/venusian-appkit/overview): the [session](https://venusian.projectsaturnstudios.com/docs/0.11.x/ecosystem/framework-surface-modules/venusian-appkit/guide/session), [windows and menus](https://venusian.projectsaturnstudios.com/docs/0.11.x/ecosystem/framework-surface-modules/venusian-appkit/guide/windows-and-menus), [staged windows](https://venusian.projectsaturnstudios.com/docs/0.11.x/ecosystem/framework-surface-modules/venusian-appkit/guide/staged-windows), [primitives](https://venusian.projectsaturnstudios.com/docs/0.11.x/ecosystem/framework-surface-modules/venusian-appkit/guide/primitives) and [input](https://venusian.projectsaturnstudios.com/docs/0.11.x/ecosystem/framework-surface-modules/venusian-appkit/guide/input).
 
-```php
-$engine = app('drawing')->renderer('opengl', ['output' => $canvas]);
-```
+## AI-assisted development
 
-## Staged windows
+This codebase was built with LLM assistance under human direction. Prompts, reviews, and architectural decisions were owned by a professional software engineer — the model accelerates drafting and exploration; it does not replace judgment on APIs, dependency direction, or what ships.
 
-The driver is a stager too: `app('staged-windows')->open('game', 1280, 720, ['toolkit' => 'appkit', …])` makes an `AppkitStagedWindow`, a window whose whole content is one output. Its backend is `appkit/cocoa`.
+## Contributing
 
-```php
-$window = app('staged-windows')->open('game', 640, 400, ['toolkit' => 'appkit', 'vsync' => VSync::Off]);
-$window->setScaling(ScaleFilter::Nearest, ScaleFit::Integer);
-$frame = $window->framebuffer('dirty', 320, 200);
-$frame->setPixel(10, 10, 0xFF0000FF);
-$window->present();                                   // only the damaged rects are redrawn
-$window->setMode(WindowMode::Exclusive, $window->displayModes()[1]);
-```
+Thank you for considering contributing to Venusian AppKit! The contribution guide can be found in the [Venusian documentation](https://venusian.projectsaturnstudios.com/docs/contributions).
 
-* Presenting: the frame is copied into a `CGImage`; only the damaged rects are marked for display, and `drawRect:` draws the image into `presentRect()` with the scaling filter. Vsync `On` leaves the draw to AppKit's display cycle; the others draw at once.
-* Modes: `Fullscreen` is native full screen (its own Space, animated; a display passed moves the window there first). `Exclusive` captures the display, switches its mode, and covers it at the shielding level; leaving, or closing the window, puts the desktop mode back and releases the display. A mode asked for during a full-screen transition, or before the window is shown, is applied after.
-* The window is an `ObjCStageWindow`, so a borderless one takes focus and `focusable: false` refuses it.
-* Capabilities: position, always-on-top, focusable, opacity, icon (the app's Dock icon, one per app), keep-awake (an IOPM display-sleep assertion), attention (Dock bounce until active), exclusive fullscreen, and the frame clock (a `CADisplayLink` on the view posting `WindowFrameDue`, macOS 14 and later). Hit tests wait for HumanInput.
-* Aspect: an exact ratio is AppKit's own; a range is kept by correcting the size after each resize.
-* Lending: the same three surfaces as the canvas (Metal layer, SDL window, GL context), from the shared `LendsAppkitSurfaces` trait.
+## Code of Conduct
 
-## Human input
+In order to ensure that the Venusian community is welcoming to all, please review and abide by the [Code of Conduct](https://venusian.projectsaturnstudios.com/docs/contributions#code-of-conduct).
 
-With Surface's HumanInput installed, the provider registers the `appkit` input engine and the `gamecontroller` pad source (Surface's default `pads.mac`). HumanInput starts the engine when the AppKit session connects, and the pad source on its first poll, with or without a window.
+## Security Vulnerabilities
 
-```php
-use Surface\Contracts\HumanInput\GamepadButton;
-use Surface\Contracts\HumanInput\Key;
-use Surface\HumanInput\MagicAliases\HumanInput;
+Please review [our security policy](https://github.com/jovian-packages/venusian-appkit/security/policy) on how to report security vulnerabilities.
 
-$keys = HumanInput::keyboard();
-if ($keys->isPressed(Key::SPACE)) { $this->jump(); }
-$this->name .= $keys->text();
+## License
 
-foreach (HumanInput::gameControllers() as $pad) {        // 'gc-<hash>': a DualSense reads as "DualSense Wireless Controller"
-    $this->x += 2 * $pad->leftStick()['x'];
-    if ($pad->isPressed(GamepadButton::NORTH)) { $this->jump(); }
-}
-```
-
-* **Keys** are macOS key codes: positions, not letters, named as SDL names them on macOS (Surface's `MacKeycodes`).
-  * Text is what a key down types. Nothing is typed while Command or Control is held, and control and function-key characters are dropped.
-  * A repeat types again and leaves the key down.
-  * A key let go while Command is held still reads released: the engine reads events before AppKit sends them.
-  * Caps Lock is one press per toggle.
-* **The pointer** reads in the window of this package's under it, toolkit or staged, key or not, in points from the content's top left. Between events the engine follows the system pointer. Over no window of ours, `window()` is null and the last position stays. Buttons count when clicked in one of our windows, or let go over one.
-* **The wheel** reads as SDL reads it on macOS: mouse ticks are whole steps, trackpads give tenths, and a natural scroll is turned back, so `dy > 0` is always rolled away from the user.
-* **Switching away** (Cmd-Tab, a click on another app) releases every key and button.
-* **Releases AppKit keeps to itself** still read: a button or slider being clicked, or a context menu open, dequeues its own events, so each poll releases what the system no longer holds (`NSEvent::pressedMouseButtons()`, `CGEventSourceKeyState`). A key let go over another of the app's windows (an About or save panel) reads released too.
-* **Pads** are `gc-<hash>` devices for every toolkit's windows on the Mac, and for scripts with none.
-  * GameController gives input to the active app only. The source asks for background events once a pad connects; `app('human-input')->pads()->backgroundMonitoring()` says whether macOS granted them.
-  * macOS 15.4.x refuses them. In a sketch with a window, pads then follow focus as keys do: switching away releases them.
-  * A script with no window on 15.4.x can never be the active app, so its pad reads throw, naming `'sdl3'`. Set `'pads' => ['mac' => 'sdl3']` in the app's `config/human-input.php` (with jovian/venusian-sdl3) to read pads there.
-  * `setPlayerIndex(0..3)` lights a DualSense's player LEDs; `hardwareId()` is null.
-* **While the engine runs,** each of our windows takes moved events (`setAcceptsMouseMovedEvents`), and an observer listens for the app resigning active. Both are undone at disconnect.
-
-## Edit menu
-
-A profile's edit roles become AppKit's own Edit items: `undo:`, `redo:`, `cut:`, `copy:`, `paste:` and `selectAll:` with no target, on Cmd-Z, Shift-Cmd-Z, Cmd-X, Cmd-C, Cmd-V and Cmd-A. AppKit sends them to the focused text field, text view or table, and greys them out when nothing focused takes them; a custom item in the same folder stays enabled. macOS routes Cmd-C and the rest to a text field only through the menu bar, so a window whose profile has no Edit folder gets none of them.
-
-## Menu state and accelerators
-
-`$window->setItemEnabled('view.refresh', false)` disables a node of the window's bar; `isItemEnabled()` reads its own state back. The driver's `setItemEnabled()` does the same for the default bar, and a default bar built later starts from it. A folder that is disabled disables every node below it; when it is enabled again, each node below it returns to its own state. A node that is not enabled shows as disabled, posts nothing, and its key equivalent does nothing. The calls post nothing. `'enabled' => false` in a profile or a context menu makes a node start disabled.
-
-In a folder with edit roles, the menu keeps autoenable on so the roles follow the first responder, and AppKit ignores `setEnabled` there: an item is disabled by a null action, a folder by its own `NSMenuItem` as target with an action that the item does not implement (`venusianDisabledFolder:`). An enabled folder there has a target that does nothing.
-
-`'keys' => 'Primary+Shift+F5'` becomes a key equivalent and a modifier mask (`AppkitMenuBar::keyEquivalent()`, `modifierMask()`): letters lower case with Shift in the mask, function keys as AppKit's function-key characters, Backspace as `NSBackspaceCharacter` (the Delete key chooses it), Escape as `"\e"`. AppKit sends a key to the menu before the focused view, so an accelerator gets its key first.
-
-## Child windows, close confirmation, button roles
-
-`driver()->open('goto', 300, 120, null, $main)` opens a child: a sheet on `$main`, which takes no input until the sheet closes. `$main->close()` closes the child first. While a child is key, the menu bar shows the default bar with every item but the edit roles disabled.
-
-`$window->confirmClose()` keeps the window open on its close button and posts `WindowCloseRequested`; `close()` still closes it.
-
-`$button->setRole(ButtonRole::DEFAULT)` makes Return and keypad Enter click the button, wherever the focus is, except in a text area; `ButtonRole::CANCEL` does the same for Esc. The default button draws as the default button. Esc in a child with no cancel button closes it (or posts `WindowCloseRequested` while it confirms close).
-
-## Focus and window keys
-
-`$input->focus()` makes the input first responder (`makeFirstResponder:`) and posts nothing; `hasFocus()` and `$window->focused()` read it back. A text area, table or tree focuses its inner view. A view that takes no first responder (a label, a default canvas) throws `WindowException`. `$window->setInitialFocus($input)` focuses it on each `present()`, which posts no focus mail either (AppKit's own first key view included). Code that hides or disables the focused view posts nothing. The user's moves, by click or Tab, post `FocusLost` then `FocusGained`, compared after each event the session dispatches.
-
-A canvas takes no focus until `$canvas->setFocusable()`; then a click on it takes focus (on a lent OpenGL view too), and Tab moves on. `setFocusable(true, takesTab: true)` keeps Tab and Shift-Tab on it (an editor pane). Tab and Shift-Tab walk the views in their on-screen order.
-
-A key that nothing took (a menu accelerator, the default and cancel buttons, the focused view) reaches the window's `keyDown:` and posts `WindowKeyPressed` with the physical key, the layout's text (`''` for a function key), the modifiers and the repeat flag. A focused text input takes every key it is sent, function keys included (F5 is its completion), so none reaches the window from one; use a menu accelerator for a command.
-
-```php
-$window->setInitialFocus($window->view('m.path'));
-$window->present();
-// loop($mail): WindowKeyPressed('main', Key::F5, '', new Modifiers(), false) when F5 is pressed outside a text input
-```
-
-## Dialogs, clipboard, desktop
-
-```php
-$id = driver()->dialogs()->alert($main, new Alert('Save changes?', 'Two files', ['Save', 'Discard', 'Cancel']));
-// loop($mail): AlertAnswered($id, 0 | 1 | 2) on dialog.alert.<id>; -1 when $main closed first
-$id = driver()->dialogs()->openFiles($main, new OpenRequest('Compare', getcwd(), multiple: true));
-$id = driver()->dialogs()->saveFile($main, new SaveRequest(name: 'report.txt'));
-// loop($mail): FilesChosen($id, [absolute paths]) on dialog.files.<id>; [] when cancelled or $main closed first
-driver()->clipboard()->setText('/path/to/file');
-driver()->desktop()->open('/path/to/file'); // its default app; InvalidArgumentException when nothing is there
-```
-
-Alerts and panels are sheets on their parent (`NSAlert`, `NSOpenPanel`, `NSSavePanel`). Return answers the default button, Esc the cancel button, keypad Enter as Return. A parent holds one sheet: a second dialog or a child throws `WindowException` while one is open, and the close button does nothing. `$main->close()` answers the open dialog first.
-
-## Links
-`link(name, text, url)` is a selectable label whose attributed text carries `NSLinkAttributeName` (an NSURL, or the URL string when NSURL cannot parse it) and the font: AppKit draws it as a link and opens it through NSWorkspace when it is clicked, in the browser for http and https, and nothing posts. A disabled link is a disabled control.
-
-## Text areas
-
-`textArea(name, text)` is an NSTextView in its NSScrollView: read-only and disabled both leave it selectable but not editable, it wraps or scrolls sideways, takes the monospaced system font when a `FontSpec` asks for monospace, paints line backgrounds as NSTextBlock paragraph styles (TextKit 1) and range colours as text attributes, selects whole lines, and reads and sets its scroll position as content fractions. A watched area posts `view.scrolled.<window>.<path>` (`ViewScrolled`, latest only) for scrolls the user makes; scrolls its own calls cause post nothing.
-
-## Split and tab views
-
-`split(name, horizontal)` is an NSSplitView with thin dividers whose arranged subviews are the panes; a hidden pane collapses, and `positions()` / `setPositions()` are the dividers between visible panes as fractions of the split's length. Its first layout shares the length equally unless positions were set before it. A user's divider drag posts `view.split-moved.<window>.<path>` (`SplitMoved`) once it ends, if a divider moved: NSSplitView tracks the drag in a nested loop, so a local event monitor takes the mouse-down on a divider and dispatches it itself, and the drag ends when that dispatch returns. Window resizes and `setPositions()` post nothing.
-
-`tabs(name)` is an NSTabView with one item per `addPage()`, identified by the page's name, the page's column pinned inside the item's view. A user's tab switch posts `view.tab-selected.<window>.<path>` (`TabSelected`); `select()`, adding the first page and removing the selected one post nothing.
-
-```php
-$split = $window->column('main')->split('panes')->fill();
-$split->column('left')->textArea('a', $left)->fill();
-$split->column('right')->textArea('b', $right)->fill();
-$split->setPositions([0.5]);
-
-$tabs = $window->column('main')->tabs('sessions')->fill();
-$tabs->addPage('one', 'left.txt ↔ right.txt')->label('hint', 'Drop files here');
-```
-
-## Trees
-
-`tree(name, columns, nodes)` is an NSOutlineView in an NSScrollView. It has one NSTableColumn per `TableColumn`, and the first is the outline column. A data source answers from the nodes. Its items are one NSString per node id, kept by the driver because AppKit does not retain them, and kept for an id across `setNodes()` because AppKit keys expansion and selection by the item. Each cell is a label with the node's text, in the node's colour for that column. These post mail, but only for the user's actions:
-
-- a user's selection: `view.node-selected.<window>.<path>` (`NodeSelected`), and only when the selected node changed;
-- a user's expand or collapse: `view.node-expanded.<window>.<path>` (`NodeExpanded`);
-- a double click, or Return or Enter while the outline is first responder: `view.node-activated.<window>.<path>` (`NodeActivated`). A local key-down monitor takes Return and Enter before AppKit does.
-
-`expand()`, `selectNode()` and `setNodes()` post nothing. AppKit closes a node's expanded descendants with it and reopens them when it opens again; those post nothing. A descendant that code collapsed while it was hidden stays collapsed.
-
-```php
-use Surface\Contracts\Windows\Primitives\TableColumn;
-use Surface\Contracts\Windows\Primitives\TreeNode;
-use Surface\NutsAndBolts\Color;
-
-$tree = $window->column('main')->tree('files', [new TableColumn('name', 'Name'), new TableColumn('size', 'Size')], [
-    new TreeNode('src', ['name' => 'src'], [new TreeNode('src/a.php', ['name' => 'a.php', 'size' => '2 KB'], colors: ['name' => Color::rgb(200, 0, 0)])]),
-])->fill();
-$tree->expand('src')->selectNode('src/a.php');
-```
-
-## Right-click mail
-
-A right click in a window posts mail naming what was clicked: `view.right-clicked.<window>.<path>` for the innermost primitive under the pointer (`x`, `y` in that primitive, from its top-left), or `window.right-clicked.<window>` on bare content. A right click is the right button (a two-finger or Magic Mouse right click is one) or Ctrl-click. A disabled primitive posts nothing; native context menus still open.
-
-```php
-foreach ($mail as $m) {
-    if ($m instanceof \Surface\Contracts\Windows\Mail\View\RightClicked) {
-        $this->menuFor($m->path, $m->x, $m->y);
-    }
-}
-```
-
-## Canvas pointer mail
-
-A canvas that watches the pointer posts what the user does on it, in points from its top-left:
-
-```php
-$board = $window->column('m')->canvas('board')->fill()->watchPointer();
-```
-
-* `view.pressed.<window>.<path>` (`x`, `y`, `button`, `clicks`, `modifiers`) when a button goes down on it. That canvas then owns the press: another button posts nothing until it ends, and `clicks` is AppKit's click count, so a triple click is 3.
-* `view.dragged.<window>.<path>` for each move that changed the point while the button is held, outside the canvas and the window too (the coordinates go negative or past its size).
-* `view.released.<window>.<path>` exactly once per press: at the button's release, or at the press's last point when a context menu opens for it. A press the code ends — `watchPointer(false)`, disabling the canvas or a group above it, removing it, closing the window — posts nothing, as no mail comes from code.
-* `view.wheeled.<window>.<path>` (`dx`, `dy`, `precise`, `modifiers`) for the wheel over it, which the canvas keeps: a scroll view around it does not scroll. `precise` is true for trackpad points, false for notches (one notch is 1.0). While it is not watching, the wheel scrolls that view as before and nothing posts.
-
-`view.clicked` and the right-click rules post as they do otherwise, watching or not.
+Venusian AppKit is open-sourced software licensed under the [MIT license](LICENSE).
