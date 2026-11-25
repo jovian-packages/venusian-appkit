@@ -13,6 +13,7 @@ use NSLayoutConstraintOrientation;
 use Surface\Toolkits\UI\TKGrid;
 use Surface\Toolkits\UI\TKPrimitive;
 use Surface\Contracts\Toolkits\UI\Align;
+use Surface\Contracts\Toolkits\UI\Insets;
 use Jovian\Toolkits\Appkit\UI\Concerns\AppkitNative;
 use Jovian\Toolkits\Appkit\UI\Concerns\StretchesChildren;
 use Jovian\Toolkits\Appkit\UI\Concerns\CarriesEnabledDown;
@@ -20,6 +21,10 @@ use Jovian\Toolkits\Appkit\UI\Concerns\CarriesEnabledDown;
 /**
  * An NSGridView inside a plain view. Merged cells cannot be unmerged, so the grid view is
  * built again whenever a child changes cells or leaves.
+ *
+ * The padding is the grid's pins inside the plain view, each side its own. A child's margin
+ * is not shown: NSGridView's own space round a cell is a whole row's top and bottom padding
+ * and a whole column's leading and trailing padding, which would move every cell in that line.
  */
 class AppkitGrid extends TKGrid
 {
@@ -71,6 +76,11 @@ class AppkitGrid extends TKGrid
     {
         $this->grid->setRowSpacing((float) $spacing);
         $this->grid->setColumnSpacing((float) $spacing);
+    }
+
+    protected function applyPadding(Insets $padding): void
+    {
+        $this->settle();
     }
 
     protected function childLayoutChanged(TKPrimitive $child): void
@@ -198,10 +208,10 @@ class AppkitGrid extends TKGrid
 
         $grid = $this->grid;
         $frame = $this->native();
-        $padding = (float) $this->padding;
+        $padding = $this->padding();
         $this->pins = [
-            $grid->leadingAnchor()->constraintEqualToAnchorConstant($frame->leadingAnchor(), $padding),
-            $grid->topAnchor()->constraintEqualToAnchorConstant($frame->topAnchor(), $padding),
+            $grid->leadingAnchor()->constraintEqualToAnchorConstant($frame->leadingAnchor(), (float) $padding->left),
+            $grid->topAnchor()->constraintEqualToAnchorConstant($frame->topAnchor(), (float) $padding->top),
         ];
         $this->ties = [];
 
@@ -213,13 +223,13 @@ class AppkitGrid extends TKGrid
                 }
             }
 
-            [$end, $room, $length] = $across
-                ? [$grid->trailingAnchor(), $frame->trailingAnchor(), $grid->widthAnchor()]
-                : [$grid->bottomAnchor(), $frame->bottomAnchor(), $grid->heightAnchor()];
+            [$end, $room, $length, $inset] = $across
+                ? [$grid->trailingAnchor(), $frame->trailingAnchor(), $grid->widthAnchor(), (float) $padding->right]
+                : [$grid->bottomAnchor(), $frame->bottomAnchor(), $grid->heightAnchor(), (float) $padding->bottom];
             if ($fillers !== []) {
-                $this->pins[] = $end->constraintEqualToAnchorConstant($room, -$padding);
+                $this->pins[] = $end->constraintEqualToAnchorConstant($room, -$inset);
             } else {
-                $this->pins[] = $end->constraintLessThanOrEqualToAnchorConstant($room, -$padding);
+                $this->pins[] = $end->constraintLessThanOrEqualToAnchorConstant($room, -$inset);
                 $natural = $length->constraintEqualToConstant(0.0);
                 $natural->setPriority(480.0);
                 $this->pins[] = $natural;

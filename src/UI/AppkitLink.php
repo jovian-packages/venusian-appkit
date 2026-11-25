@@ -18,6 +18,10 @@ use Jovian\Toolkits\Appkit\UI\Concerns\TakesInputFromAbove;
  * A label whose attributed text carries NSLinkAttributeName: selectable and allowing editing
  * of text attributes, AppKit draws it as a link and opens it on a click. Every change writes
  * the attributed text again, so link, font and alignment stay on it together.
+ *
+ * A text colour is not shown: AppKit draws a link in its own link colour, over the text's
+ * NSForegroundColorAttributeName (seen 2026-11-24: a magenta foreground drew in the link
+ * colour), and the field editor's linkTextAttributes are not bound.
  */
 class AppkitLink extends TKLink
 {

@@ -2,21 +2,28 @@
 
 namespace Jovian\Toolkits\Appkit\UI\Concerns;
 
-use NSView;
 use NSEdgeInsets;
 use NSStackView;
 use NSLayoutAttribute;
 use NSLayoutConstraint;
 use NSStackViewDistribution;
-use NSLayoutConstraintOrientation;
 use NSUserInterfaceLayoutOrientation;
 use Surface\Toolkits\UI\TKPrimitive;
-use Surface\Toolkits\UI\TKPrimitiveGroup;
 use Surface\Contracts\Toolkits\UI\Align;
+use Surface\Contracts\Toolkits\UI\Insets;
 
 /**
  * What an AppKit column and row share: an NSStackView, built with the spacing; the padding is
  * its edge insets along the axis and the inset of each child's constraints across it.
+ *
+ * A child's margin is this stack's to keep, all of it native layout:
+ *  - across the axis, added to the padding in the constants of the child's constraints;
+ *  - between two shown children, the stack's custom spacing after the first: spacing, its
+ *    margin after, and the next one's margin before;
+ *  - before the first shown child and after the last, along the axis, added to the padding in
+ *    the stack's edge insets.
+ * Left and right are the leading and trailing sides, in the left-to-right layout AppKit uses
+ * for a left-to-right language.
  *
  * Fill and alignment are this stack's, as constraints it keeps per child (GTK's model):
  *  - Along the axis a child keeps its natural length (content hugging 750) unless it fills
@@ -26,8 +33,9 @@ use Surface\Contracts\Toolkits\UI\Align;
  *  - Across the axis the stack sets no alignment of its own (NOT_AN_ATTRIBUTE): each child is
  *    pinned per its Align, inside the padding. FILL stretches it; START, CENTER and END keep
  *    its natural size.
- *  - A child fills when it, or anything shown inside it, fills, as GTK computes expand. A
- *    change of that ripples up to the containers above.
+ *  - A child fills when Topside's expands() says so: it, or anything shown inside it, fills,
+ *    as GTK computes expand (an overlay's covering child excepted). A change of that ripples
+ *    up to the containers above.
  *  - A view with no intrinsic size (a stack, a fixed) keeps its natural size through a low
  *    pull to zero (480), so what it holds sets its size; content hugging alone does nothing
  *    for it.
@@ -38,6 +46,7 @@ trait AppkitStackChildren
 {
     use AppkitNative;
     use CarriesEnabledDown;
+    use AppkitPlacesChildren;
 
     /**
      * Each child's constraints, by child uuid: where it sits across the axis, and the pulls
@@ -64,9 +73,8 @@ trait AppkitStackChildren
         $stack->setDistribution(NSStackViewDistribution::GRAVITY_AREAS);
         $stack->setAlignment(NSLayoutAttribute::NOT_AN_ATTRIBUTE);
         $stack->setSpacing((float) $this->spacing());
-        $padding = (float) $this->padding;
-        $stack->setEdgeInsets(new NSEdgeInsets($padding, $padding, $padding, $padding));
         $this->adoptNative($stack);
+        $this->space();
     }
 
     /**
@@ -103,15 +111,30 @@ trait AppkitStackChildren
         $native = $child->native();
         $this->stackNative()->removeArrangedSubview($native);
         $this->stackNative()->insertArrangedSubviewAtIndex($native, $index);
+        $this->space();
     }
 
     protected function applySpacing(int $spacing): void
     {
         $this->stackNative()->setSpacing((float) $spacing);
+        $this->space();
     }
 
     /**
-     * fill() or align() changed on a child, or whether something inside it fills.
+     * The edge insets again, and every child placed again inside the new sides.
+     */
+    protected function applyPadding(Insets $padding): void
+    {
+        foreach ($this->children() as $child) {
+            if (isset($this->placed[$child->uuid()])) {
+                $this->place($child);
+            }
+        }
+        $this->space();
+    }
+
+    /**
+     * fill(), align() or the margin changed on a child, or whether something inside it fills.
      */
     protected function childLayoutChanged(TKPrimitive $child): void
     {
@@ -138,9 +161,14 @@ trait AppkitStackChildren
         $vertical = $this->isVertical();
         $view = $child->native();
         $stack = $this->stackNative();
-        $padding = (float) $this->padding;
         [$alignH, $alignV] = $child->aligned();
         $across = $vertical ? $alignH : $alignV;
+        // Padding and margin on the two sides across the axis.
+        $padding = $this->padding();
+        $margin = $child->margin();
+        [$before, $after] = $vertical
+            ? [(float) ($padding->left + $margin->left), (float) ($padding->right + $margin->right)]
+            : [(float) ($padding->top + $margin->top), (float) ($padding->bottom + $margin->bottom)];
 
         $constraints = [];
         // Along the axis: grows only while it fills.
@@ -153,32 +181,8 @@ trait AppkitStackChildren
             }
         }
 
-        [$start, $end, $center] = $vertical
-            ? [$view->leadingAnchor(), $view->trailingAnchor(), $view->centerXAnchor()]
-            : [$view->topAnchor(), $view->bottomAnchor(), $view->centerYAnchor()];
-        [$stackStart, $stackEnd, $stackCenter] = $vertical
-            ? [$stack->leadingAnchor(), $stack->trailingAnchor(), $stack->centerXAnchor()]
-            : [$stack->topAnchor(), $stack->bottomAnchor(), $stack->centerYAnchor()];
-
-        array_push($constraints, ...match ($across) {
-            Align::FILL => [
-                $start->constraintEqualToAnchorConstant($stackStart, $padding),
-                $end->constraintEqualToAnchorConstant($stackEnd, -$padding),
-            ],
-            Align::START => [
-                $start->constraintEqualToAnchorConstant($stackStart, $padding),
-                $end->constraintLessThanOrEqualToAnchorConstant($stackEnd, -$padding),
-            ],
-            Align::END => [
-                $start->constraintGreaterThanOrEqualToAnchorConstant($stackStart, $padding),
-                $end->constraintEqualToAnchorConstant($stackEnd, -$padding),
-            ],
-            Align::CENTER => [
-                $center->constraintEqualToAnchor($stackCenter),
-                $start->constraintGreaterThanOrEqualToAnchorConstant($stackStart, $padding),
-                $end->constraintLessThanOrEqualToAnchorConstant($stackEnd, -$padding),
-            ],
-        });
+        // Across the axis, by its Align, inside the padding and margin on those two sides.
+        array_push($constraints, ...self::alignOn(self::anchorsOn($view, $vertical), self::anchorsOn($stack, $vertical), $across, $before, $after));
 
         NSLayoutConstraint::activateConstraints($constraints);
         $this->placed[$child->uuid()] = $constraints;
@@ -212,6 +216,7 @@ trait AppkitStackChildren
             $this->ties[] = $tie;
         }
         NSLayoutConstraint::activateConstraints($this->ties);
+        $this->space();
 
         $parent = $this->parent();
         if (! is_null($parent) && ! $this->isRemoved()) {
@@ -220,52 +225,67 @@ trait AppkitStackChildren
     }
 
     /**
-     * Whether $child takes spare space along an axis: its own fill, or that of anything
-     * shown inside it.
+     * The space along the axis: padding and the first and last shown child's outer margin as
+     * the edge insets (across the axis the insets are the padding alone; the constraints keep
+     * those sides), and between shown children the spacing plus the margins that face each
+     * other as the custom spacing after the first. A hidden child is out of the arrangement,
+     * so its margin counts nowhere.
      */
-    private static function fillsAlong(TKPrimitive $child, bool $horizontal): bool
+    private function space(): void
     {
-        if ($child->fills()[$horizontal ? 0 : 1]) {
-            return true;
-        }
-        if ($child instanceof TKPrimitiveGroup) {
-            foreach ($child->children() as $inner) {
-                if (! $inner->isRemoved() && $inner->isVisible() && self::fillsAlong($inner, $horizontal)) {
-                    return true;
+        $stack = $this->stackNative();
+        $vertical = $this->isVertical();
+        $spacing = (float) $this->spacing();
+        $padding = $this->padding();
+
+        $shown = [];
+        foreach ($this->children() as $child) {
+            if (! $child->isRemoved() && isset($this->placed[$child->uuid()])) {
+                if ($child->isVisible()) {
+                    $shown[] = $child;
+                } else {
+                    $stack->setCustomSpacingAfterView($spacing, $child->native());
                 }
             }
         }
 
-        return false;
+        foreach ($shown as $at => $child) {
+            $next = $shown[$at + 1] ?? null;
+            $gap = is_null($next) ? $spacing : $spacing + self::marginAfter($child, $vertical) + self::marginBefore($next, $vertical);
+            $stack->setCustomSpacingAfterView($gap, $child->native());
+        }
+
+        $first = $shown === [] ? 0 : self::marginBefore($shown[0], $vertical);
+        $last = $shown === [] ? 0 : self::marginAfter($shown[count($shown) - 1], $vertical);
+        $stack->setEdgeInsets($vertical
+            ? new NSEdgeInsets((float) $padding->top + $first, (float) $padding->left, (float) $padding->bottom + $last, (float) $padding->right)
+            : new NSEdgeInsets((float) $padding->top, (float) $padding->left + $first, (float) $padding->bottom, (float) $padding->right + $last));
     }
 
     /**
-     * Content hugging on one axis: 750 to keep the natural length, 1 to grow. A view with no
-     * intrinsic length on that axis gets, while it keeps its natural length, a pull to zero at
-     * 480 (returned, not yet active), below a window's size-stay-put (500), so its content
-     * decides its length and a natural size never resizes a window.
+     * A child's margin on the side facing the start of the axis (top, or left).
      */
-    private static function hug(NSView $view, bool $horizontal, bool $keep): ?NSLayoutConstraint
+    private static function marginBefore(TKPrimitive $child, bool $vertical): int
     {
-        $orientation = $horizontal ? NSLayoutConstraintOrientation::HORIZONTAL : NSLayoutConstraintOrientation::VERTICAL;
-        $priority = $keep ? 750.0 : 1.0;
-        $view->setContentHuggingPriorityForOrientation($priority, $orientation);
-        if ($view instanceof NSStackView) {
-            // The stack pulls its edges in to its children at this priority. Just below a
-            // child's own hugging (750), so a START or END child keeps its natural size and
-            // the stack is what gives way; at 750 the two tie and AppKit stretches the child.
-            $view->setHuggingPriorityForOrientation($keep ? 740.0 : $priority, $orientation);
-        }
+        return $vertical ? $child->margin()->top : $child->margin()->left;
+    }
 
-        $intrinsic = $view->intrinsicContentSize();
-        if (! $keep || ($horizontal ? $intrinsic->width : $intrinsic->height) >= 0.0) {
-            return null;
-        }
+    /**
+     * Its margin on the side facing the end of the axis (bottom, or right).
+     */
+    private static function marginAfter(TKPrimitive $child, bool $vertical): int
+    {
+        return $vertical ? $child->margin()->bottom : $child->margin()->right;
+    }
 
-        $pull = ($horizontal ? $view->widthAnchor() : $view->heightAnchor())->constraintEqualToConstant(0.0);
-        $pull->setPriority(480.0);
-
-        return $pull;
+    /**
+     * Whether $child takes spare space along an axis, as Topside's expands() says: its own
+     * fill, or that of anything shown inside it that passes it on (an overlay's covering child
+     * does not).
+     */
+    private static function fillsAlong(TKPrimitive $child, bool $horizontal): bool
+    {
+        return $child->expands($horizontal);
     }
 
     private function stackNative(): NSStackView

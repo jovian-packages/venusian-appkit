@@ -14,6 +14,11 @@ use Jovian\Toolkits\Appkit\UI\Concerns\CarriesEnabledDown;
 /**
  * An NSScrollView. The document is pinned to the clip view's top, at least as tall as it
  * when it scrolls down, and as wide as it unless it scrolls across.
+ *
+ * The document's margin is not shown. The scroll view's content insets are not it (measured
+ * 2026-11-24 with a margin of 20 50 40 30): they inset the scroller too (16x300 at the edge
+ * became 16x240, 30 in), the pinned document stayed the clip view's width and ran 50 past the
+ * right edge, and its top sat 40 above the view instead of 20 below.
  */
 class AppkitScrollView extends TKScrollView
 {

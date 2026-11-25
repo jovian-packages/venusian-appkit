@@ -22,6 +22,10 @@ use Jovian\Toolkits\Appkit\UI\Concerns\TakesInputFromAbove;
  * picture's, just above the stack's pull to zero. A FIT picture's natural height follows the
  * width it was given; ext-appkit binds no aspect constraint, so that is set again, on the
  * next turn of the run loop, when the width changes.
+ *
+ * In an overlay, a picture that fills both ways has no natural size: it covers the overlay and
+ * never sizes it, so a 3000-point picture does not grow the overlay or the window. Its layer
+ * always masks to its bounds (rounded by its corners), whatever clip() says.
  */
 class AppkitImage extends TKImage
 {
@@ -49,7 +53,7 @@ class AppkitImage extends TKImage
 
         $view = NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0));
         $view->setWantsLayer(true);
-        $view->layer()?->setMasksToBounds(true);
+        $view->setClipsToBounds(true);
         $view->setPostsFrameChangedNotifications(true);
         $this->adoptNative($view);
 
@@ -83,12 +87,21 @@ class AppkitImage extends TKImage
         $this->measure();
     }
 
-    /** Rounded, and clipped: a covering picture is larger than the view. */
-    protected function applyCornerRadius(float $radius): void
+    /**
+     * Always clipped, whatever clip() says: a covering picture is larger than the view.
+     */
+    protected function masksContent(): bool
     {
-        $layer = $this->native()->layer();
-        $layer?->setCornerRadius($radius);
-        $layer?->setMasksToBounds(true);
+        return true;
+    }
+
+    /**
+     * Inside an overlay, a picture that fills both ways takes the overlay's size and gives it
+     * none: its natural size is dropped.
+     */
+    protected function applyFill(bool $horizontal, bool $vertical): void
+    {
+        $this->measure();
     }
 
     /** It takes no input, so it has nothing to disable. */
@@ -120,7 +133,7 @@ class AppkitImage extends TKImage
     {
         NSLayoutConstraint::deactivateConstraints($this->natural);
         $this->natural = [];
-        if (is_null($this->image)) {
+        if (is_null($this->image) || $this->coversOverlay()) {
             return;
         }
 
@@ -163,6 +176,14 @@ class AppkitImage extends TKImage
             }
         });
         $this->refit = [NSTimer::scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(0.0, $target, ObjCTarget::ACTION, null, false), $target];
+    }
+
+    /**
+     * In an overlay, filling both ways: sized by the overlay alone.
+     */
+    private function coversOverlay(): bool
+    {
+        return $this->parent() instanceof AppkitOverlay && $this->fills() === [true, true];
     }
 
     /**

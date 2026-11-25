@@ -25,6 +25,9 @@ use Jovian\Toolkits\Appkit\UI\Concerns\CarriesEnabledDown;
  *
  * A child is at least its minimum size. The fixed's own minimum size covers every frame,
  * since its children do not size it.
+ *
+ * A child's margin moves its frame in from the Placement's corner (left and top), and the
+ * fixed's floor reaches past it by the right and bottom margin.
  */
 class AppkitFixed extends TKFixed
 {
@@ -89,7 +92,8 @@ class AppkitFixed extends TKFixed
     }
 
     /**
-     * A child's minimum size changed: it is framed again at the larger of frame and minimum.
+     * A child's minimum size or margin changed: it is framed again at the larger of frame and
+     * minimum, in from its margin.
      */
     protected function childLayoutChanged(TKPrimitive $child): void
     {
@@ -146,8 +150,10 @@ class AppkitFixed extends TKFixed
     {
         [$width, $height] = $this->sizeOf($child, $frame);
         $top = $this->native()->frame()->height;
+        $margin = $child->margin();
+        [$x, $y] = [$frame->x + $margin->left, $frame->y + $margin->top];
 
-        $child->native()->setFrame(new NSRect((float) $frame->x, $top - $frame->y - $height, $width, $height));
+        $child->native()->setFrame(new NSRect((float) $x, $top - $y - $height, $width, $height));
     }
 
     /**
@@ -163,7 +169,8 @@ class AppkitFixed extends TKFixed
     }
 
     /**
-     * Floors at the right and bottom edge of the furthest child, and at minSize().
+     * Floors at the right and bottom edge of the furthest child (its margin included), and at
+     * minSize().
      */
     private function settleExtent(): void
     {
@@ -171,8 +178,9 @@ class AppkitFixed extends TKFixed
         foreach ($this->children() as $child) {
             $frame = $this->frameOf($child);
             [$w, $h] = $this->sizeOf($child, $frame);
-            $width = max($width, $frame->x + $w);
-            $height = max($height, $frame->y + $h);
+            $margin = $child->margin();
+            $width = max($width, $frame->x + $margin->left + $w + $margin->right);
+            $height = max($height, $frame->y + $margin->top + $h + $margin->bottom);
         }
 
         NSLayoutConstraint::deactivateConstraints($this->extent);

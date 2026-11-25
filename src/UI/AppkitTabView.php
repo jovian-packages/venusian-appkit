@@ -19,7 +19,7 @@ use Jovian\Toolkits\Appkit\UI\Concerns\CarriesEnabledDown;
 /**
  * An NSTabView; each page is pinned inside its item's view. NSTabView sizes that by frame,
  * so the pages give the tab view no size of their own: it is kept at least the strip and the
- * largest page.
+ * largest page. A page's margin is the constants of its pins inside the item's view.
  */
 class AppkitTabView extends TKTabView
 {
@@ -36,6 +36,9 @@ class AppkitTabView extends TKTabView
 
     /** @var list<NSLayoutConstraint> */
     private array $least = [];
+
+    /** @var array<string, list<NSLayoutConstraint>> each page's pins, by its uuid */
+    private array $pins = [];
 
     protected function bootstrapNative(): void
     {
@@ -68,14 +71,9 @@ class AppkitTabView extends TKTabView
         $page = $child->native();
         self::stretch($page);
         $holder->addSubview($page);
-        NSLayoutConstraint::activateConstraints([
-            $page->leadingAnchor()->constraintEqualToAnchor($holder->leadingAnchor()),
-            $page->trailingAnchor()->constraintEqualToAnchor($holder->trailingAnchor()),
-            $page->topAnchor()->constraintEqualToAnchor($holder->topAnchor()),
-            $page->bottomAnchor()->constraintEqualToAnchor($holder->bottomAnchor()),
-        ]);
 
         $this->items[$child->uuid()] = $item;
+        $this->pin($child);
         $this->tabsNative()->addTabViewItem($item);
         $this->fit();
         $this->tellExpansion();
@@ -83,6 +81,8 @@ class AppkitTabView extends TKTabView
 
     protected function detachNative(TKPrimitive $child): void
     {
+        NSLayoutConstraint::deactivateConstraints($this->pins[$child->uuid()] ?? []);
+        unset($this->pins[$child->uuid()]);
         $this->tabsNative()->removeTabViewItem($this->items[$child->uuid()]);
         unset($this->items[$child->uuid()]);
         $child->native()->removeFromSuperview();
@@ -110,6 +110,9 @@ class AppkitTabView extends TKTabView
 
     protected function childLayoutChanged(TKPrimitive $child): void
     {
+        if (isset($this->items[$child->uuid()])) {
+            $this->pin($child);
+        }
         $this->fit();
         $this->tellExpansion();
     }
@@ -118,8 +121,9 @@ class AppkitTabView extends TKTabView
     {
         $this->tabsNative()->setDelegate(null);
         $this->delegate = null;
-        NSLayoutConstraint::deactivateConstraints($this->least);
+        NSLayoutConstraint::deactivateConstraints([...$this->least, ...array_merge(...array_values($this->pins))]);
         $this->least = [];
+        $this->pins = [];
         $this->releaseView();
     }
 
@@ -134,6 +138,25 @@ class AppkitTabView extends TKTabView
         }
     }
 
+    /**
+     * The page's edges to its item's view, in from its margin.
+     */
+    private function pin(TKPrimitive $page): void
+    {
+        NSLayoutConstraint::deactivateConstraints($this->pins[$page->uuid()] ?? []);
+
+        $view = $page->native();
+        $holder = $this->items[$page->uuid()]->view();
+        $margin = $page->margin();
+        $this->pins[$page->uuid()] = [
+            $view->leadingAnchor()->constraintEqualToAnchorConstant($holder->leadingAnchor(), (float) $margin->left),
+            $view->trailingAnchor()->constraintEqualToAnchorConstant($holder->trailingAnchor(), (float) -$margin->right),
+            $view->topAnchor()->constraintEqualToAnchorConstant($holder->topAnchor(), (float) $margin->top),
+            $view->bottomAnchor()->constraintEqualToAnchorConstant($holder->bottomAnchor(), (float) -$margin->bottom),
+        ];
+        NSLayoutConstraint::activateConstraints($this->pins[$page->uuid()]);
+    }
+
     private function fit(): void
     {
         NSLayoutConstraint::deactivateConstraints($this->least);
@@ -143,7 +166,8 @@ class AppkitTabView extends TKTabView
         foreach ($this->children() as $page) {
             if (isset($this->items[$page->uuid()])) {
                 $size = $page->native()->fittingSize();
-                [$width, $height] = [max($width, $size->width), max($height, $size->height)];
+                $margin = $page->margin();
+                [$width, $height] = [max($width, $size->width + $margin->left + $margin->right), max($height, $size->height + $margin->top + $margin->bottom)];
             }
         }
 

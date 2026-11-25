@@ -62,6 +62,8 @@ use Surface\Contracts\Toolkits\UI\TKSegmentedControl;
 use Jovian\Toolkits\Appkit\UI\AppkitSegmentedControl;
 use Surface\Contracts\Toolkits\UI\TKImage;
 use Jovian\Toolkits\Appkit\UI\AppkitImage;
+use Surface\Contracts\Toolkits\UI\TKOverlay;
+use Jovian\Toolkits\Appkit\UI\AppkitOverlay;
 
 class AppkitAdapterDriver extends ToolkitAdapterDriver
 {
@@ -98,6 +100,7 @@ class AppkitAdapterDriver extends ToolkitAdapterDriver
         TKCollectionView::class => AppkitCollectionView::class,
         TKTree::class => AppkitTree::class,
         TKTextArea::class => AppkitTextArea::class,
+        TKOverlay::class => AppkitOverlay::class,
     ];
 
     public function __construct(
