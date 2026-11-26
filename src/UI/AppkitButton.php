@@ -5,15 +5,19 @@ namespace Jovian\Toolkits\Appkit\UI;
 use NSColor;
 use NSImage;
 use NSButton;
+use NSLayoutConstraint;
 use ObjCTarget;
 use WeakReference;
 use NSAttributedString;
+use NSBezelStyle;
 use NSCellImagePosition;
 use NSMutableParagraphStyle;
 use Surface\NutsAndBolts\Color;
 use Surface\Toolkits\UI\TKButton;
+use Surface\Contracts\Toolkits\UI\Insets;
 use Surface\Contracts\Toolkits\UI\ButtonRole;
 use Surface\Contracts\Toolkits\UI\ButtonStyle;
+use Surface\Contracts\Toolkits\UI\IconPosition;
 use Surface\Contracts\Toolkits\Styling\FontSpec;
 use Surface\Contracts\Toolkits\Styling\TextAlignment;
 use Jovian\Toolkits\Appkit\UI\Concerns\AppkitText;
@@ -26,11 +30,25 @@ use Jovian\Toolkits\Appkit\UI\Concerns\TakesInputFromAbove;
  * Keyboard focus follows macOS: focus() makes it first responder, and Tab reaches it only
  * while the user has Full Keyboard Access on.
  *
- * Its look is NSButton's own: BORDERLESS and LINK are an unbordered button; a text colour (and
+ * Its look is NSButton's own: BORDERLESS and LINK are an unbordered button, HELP the help bezel
+ * (AppKit's round "?", which draws no title); a text colour (and
  * LINK's NSColor linkColor) is the title's foreground colour, written as an attributed title
  * with the button's font and alignment, and the content tint, which colours a symbol icon too.
- * With no colour the title is plain again. The icon sits at the leading side of the title;
- * the role is the key equivalent (Return for DEFAULT, which AppKit also draws as the window's
+ * With no colour the title is plain again. The icon sits at the leading side of the title, or
+ * the trailing side (IMAGE_TRAILING) when setIconPosition() says so;
+ * Padding: NSButton has no content insets, and the cell draws its title centred in the frame, so
+ * the button is sized instead: width and height constraints equal to its intrinsic size plus the
+ * padding, at priority PADDING_PRIORITY (above a stack's 750 hugging, so the button is not
+ * pulled back to its natural size; a required constraint from a container, or a tie at 999,
+ * still wins). They are made again whenever the label, font, icon, icon position, style, colour
+ * or alignment changes the intrinsic size. The room is split evenly: padding that differs left
+ * and right (or top and bottom) comes out as half the total on each side. AppKit has no
+ * per-side inset, and none is faked. Insets::none() removes the constraints.
+ * With padding the cell is also told to hug (imageHugsTitle): title and icon are one group,
+ * centred in the room, so the padding sits at the outer edges. Without padding it stays off, as
+ * AppKit's own button (a stretched button keeps its icon at the edge).
+ *
+ * The role is the key equivalent (Return for DEFAULT, which AppKit also draws as the window's
  * default button, Esc for CANCEL).
  */
 class AppkitButton extends TKButton
@@ -46,6 +64,18 @@ class AppkitButton extends TKButton
      */
     private ?ObjCTarget $target = null;
 
+    /** Above the 750 hugging of a stack's children, under a tie at 999. */
+    private const float PADDING_PRIORITY = 800.0;
+
+    /**
+     * The width and height constraints that hold the padding; none while there is none.
+     * @var list<NSLayoutConstraint>
+     */
+    private array $padding_constraints = [];
+
+    /** The bezel the button was made with: back on it when HELP is no longer the style. */
+    private ?NSBezelStyle $bezel = null;
+
     /** What setTextColor() chose; null is AppKit's own (the link colour in LINK style). */
     private ?Color $text_color = null;
 
@@ -58,6 +88,7 @@ class AppkitButton extends TKButton
             $self->get()?->clicked();
         });
         $this->adoptNative(NSButton::buttonWithTitleTargetAction($this->label(), $this->target, ObjCTarget::ACTION));
+        $this->bezel = $this->buttonNative()->bezelStyle();
     }
 
     protected function applyLabel(string $label): void
@@ -65,9 +96,16 @@ class AppkitButton extends TKButton
         $this->retitle();
     }
 
+    protected function applyPadding(Insets $padding): void
+    {
+        $this->refit();
+    }
+
     protected function applyStyle(ButtonStyle $style): void
     {
-        $this->buttonNative()->setBordered($style === ButtonStyle::DEFAULT);
+        // The help bezel is AppKit's round "?": it draws no title, the label stays its accessibility text.
+        $this->buttonNative()->setBordered($style->framed());
+        $this->buttonNative()->setBezelStyle($style === ButtonStyle::HELP ? NSBezelStyle::HELP_BUTTON : $this->bezel);
         $this->retitle();
     }
 
@@ -101,7 +139,27 @@ class AppkitButton extends TKButton
 
         $button = $this->buttonNative();
         $button->setImage($image);
-        $button->setImagePosition(is_null($image) ? NSCellImagePosition::NO_IMAGE : NSCellImagePosition::IMAGE_LEADING);
+        $button->setImagePosition($this->imagePosition(! is_null($image)));
+        $this->refit();
+    }
+
+    protected function applyIconPosition(IconPosition $position): void
+    {
+        $button = $this->buttonNative();
+        $button->setImagePosition($this->imagePosition(! is_null($button->image())));
+        $this->refit();
+    }
+
+    /**
+     * Where the image goes: none without one, else at the side setIconPosition() chose.
+     */
+    private function imagePosition(bool $hasImage): NSCellImagePosition
+    {
+        return match (true) {
+            ! $hasImage => NSCellImagePosition::NO_IMAGE,
+            $this->iconPosition() === IconPosition::TRAILING => NSCellImagePosition::IMAGE_TRAILING,
+            default => NSCellImagePosition::IMAGE_LEADING,
+        };
     }
 
     protected function applyRole(?ButtonRole $role): void
@@ -122,6 +180,8 @@ class AppkitButton extends TKButton
     {
         $this->buttonNative()->setTarget(null);
         $this->target = null;
+        NSLayoutConstraint::deactivateConstraints($this->padding_constraints);
+        $this->padding_constraints = [];
         $this->releaseView();
     }
 
@@ -142,6 +202,7 @@ class AppkitButton extends TKButton
 
         if (is_null($color)) {
             $button->setTitle($this->label());
+            $this->refit();
 
             return;
         }
@@ -157,6 +218,38 @@ class AppkitButton extends TKButton
             $attributes[NSFontAttributeName] = $font;
         }
         $button->setAttributedTitle(NSAttributedString::initWithStringAttributes($this->label(), $attributes));
+        $this->refit();
+    }
+
+    /**
+     * The padding's constraints for the button as it is now: its intrinsic size (title, icon
+     * and bezel as AppKit measures them) plus the padding on both sides of each axis.
+     */
+    private function refit(): void
+    {
+        NSLayoutConstraint::deactivateConstraints($this->padding_constraints);
+        $this->padding_constraints = [];
+
+        if (is_null($this->native)) {
+            return;
+        }
+
+        $padding = $this->padding();
+        $button = $this->buttonNative();
+        $button->setImageHugsTitle($padding != Insets::none());
+        if ($padding == Insets::none()) {
+            return;
+        }
+
+        $size = $button->intrinsicContentSize();
+        $this->padding_constraints = [
+            $button->widthAnchor()->constraintEqualToConstant($size->width + $padding->left + $padding->right),
+            $button->heightAnchor()->constraintEqualToConstant($size->height + $padding->top + $padding->bottom),
+        ];
+        foreach ($this->padding_constraints as $constraint) {
+            $constraint->setPriority(self::PADDING_PRIORITY);
+        }
+        NSLayoutConstraint::activateConstraints($this->padding_constraints);
     }
 
     private function buttonNative(): NSButton

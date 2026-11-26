@@ -43,6 +43,14 @@ One `ObjCDelegate('NSWindowDelegate')`, kept on the window (AppKit holds delegat
 * `closeNative()` = `NSWindow::close()`: it sends `windowWillClose:` and skips `windowShouldClose:`, so a confirming window closes too.
 * `releaseNative()` drops the content constraints and sets the delegate to null before letting the window go: the `NSWindow` can outlive this object.
 
+# Alert
+
+`showAlert()`: an `NSAlert` begun as a sheet on the window (`beginSheetModalForWindowCompletionHandler`), the buttons added in order (the first rightmost). Every button's key equivalent is set: Return on the default, Esc on the cancel; one button holds one, so when the default is also the cancel Esc presses none, as in every AppKit alert (the bridge-era key-down monitor that answered Esc there is not ported). Style as `NSAlertStyle`, suppression as the alert's suppression button, no title (a sheet has none). `closeAlert()` ends the sheet before the window closes. `tests/Integration/AlertTest.php`: 6 cases, `performClick` on the alert's own buttons.
+
+# Browse
+
+`openUrl()`: `NSWorkspace::sharedWorkspace()->openURL()` with the address as an `NSURL`.
+
 # Not ported yet
 
 From the [bridge-era window](/architecture/windows-and-menus.md): focus tracking, window and button-role keys, right clicks, clipboard compare on key.

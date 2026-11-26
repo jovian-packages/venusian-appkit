@@ -69,6 +69,12 @@ trait AppkitNative
     private array $min_size_constraints = [];
 
     /**
+     * The width/height ceilings maxSize() set, outside a fixed.
+     * @var list<NSLayoutConstraint>
+     */
+    private array $max_size_constraints = [];
+
+    /**
      * The running transition's pending steps: each timer and the target it calls. AppKit
      * holds a timer's target strongly, but the timer is kept to invalidate it.
      * @var list<array{NSTimer, ObjCTarget}>
@@ -111,8 +117,9 @@ trait AppkitNative
         $this->stopTransition();
         $this->untrackCursor();
         $this->applyClickable(false);
-        NSLayoutConstraint::deactivateConstraints($this->min_size_constraints);
+        NSLayoutConstraint::deactivateConstraints([...$this->min_size_constraints, ...$this->max_size_constraints]);
         $this->min_size_constraints = [];
+        $this->max_size_constraints = [];
         $this->native->removeFromSuperview();
         $this->native = null;
     }
@@ -377,6 +384,28 @@ trait AppkitNative
             $this->native->heightAnchor()->constraintGreaterThanOrEqualToConstant((float) $height),
         ];
         NSLayoutConstraint::activateConstraints($this->min_size_constraints);
+    }
+
+    /**
+     * Width and height ceilings as required constraints, 0 none that way. The container first
+     * placed the child to grow up to them where it wants its room (AppkitPlacesChildren). Inside
+     * a fixed the frame is capped instead.
+     */
+    protected function applyMaxSize(int $width, int $height): void
+    {
+        NSLayoutConstraint::deactivateConstraints($this->max_size_constraints);
+        $this->max_size_constraints = [];
+        if ($this->parent() instanceof AppkitFixed) {
+            return;
+        }
+
+        if ($width > 0) {
+            $this->max_size_constraints[] = $this->native->widthAnchor()->constraintLessThanOrEqualToConstant((float) $width);
+        }
+        if ($height > 0) {
+            $this->max_size_constraints[] = $this->native->heightAnchor()->constraintLessThanOrEqualToConstant((float) $height);
+        }
+        NSLayoutConstraint::activateConstraints($this->max_size_constraints);
     }
 
     protected function applyTooltip(?string $tooltip): void

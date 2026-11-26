@@ -157,15 +157,19 @@ class AppkitFixed extends TKFixed
     }
 
     /**
-     * The frame's size, or the child's minimum size where that is larger.
+     * The frame's size, or the child's minimum size where that is larger, no larger than its
+     * maximum (a minimum above the maximum wins, as a required floor would).
      *
      * @return array{float, float}
      */
     private function sizeOf(TKPrimitive $child, Placement $frame): array
     {
         [$width, $height] = $child->minimumSize();
+        [$maxWidth, $maxHeight] = $child->maximumSize();
+        $width = max($width, $frame->width);
+        $height = max($height, $frame->height);
 
-        return [(float) max($width, $frame->width), (float) max($height, $frame->height)];
+        return [(float) ($maxWidth > 0 ? min($width, max($maxWidth, $child->minimumSize()[0])) : $width), (float) ($maxHeight > 0 ? min($height, max($maxHeight, $child->minimumSize()[1])) : $height)];
     }
 
     /**

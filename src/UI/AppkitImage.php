@@ -5,12 +5,7 @@ namespace Jovian\Toolkits\Appkit\UI;
 use NSRect;
 use NSView;
 use NSImage;
-use NSTimer;
-use ObjCTarget;
-use WeakReference;
-use NSOperationQueue;
 use NSLayoutConstraint;
-use NSNotificationCenter;
 use Surface\Toolkits\UI\TKImage;
 use Surface\Toolkits\ToolkitException;
 use Surface\Contracts\Toolkits\UI\ImageScaling;
@@ -19,9 +14,9 @@ use Jovian\Toolkits\Appkit\UI\Concerns\TakesInputFromAbove;
 
 /**
  * A view whose layer shows the picture: NSImageView cannot cover. Its natural size is the
- * picture's, just above the stack's pull to zero. A FIT picture's natural height follows the
- * width it was given; ext-appkit binds no aspect constraint, so that is set again, on the
- * next turn of the run loop, when the width changes.
+ * picture's, just above the stack's pull to zero (485). A FIT picture's natural height is its
+ * width times the picture's height over width (NSLayoutDimension constraintEqualToAnchor:
+ * multiplier:, at 485), so it follows the width it is given in the same layout pass.
  *
  * In an overlay, a picture that fills both ways has no natural size: it covers the overlay and
  * never sizes it, so a 3000-point picture does not grow the overlay or the window. Its layer
@@ -39,13 +34,6 @@ class AppkitImage extends TKImage
     /** @var list<NSLayoutConstraint> */
     private array $natural = [];
 
-    private float $fit_width = 0.0;
-
-    private ?object $watching = null;
-
-    /** @var array{NSTimer, ObjCTarget}|null */
-    private ?array $refit = null;
-
     protected function bootstrapNative(): void
     {
         $file = $this->file();
@@ -54,18 +42,7 @@ class AppkitImage extends TKImage
         $view = NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0));
         $view->setWantsLayer(true);
         $view->setClipsToBounds(true);
-        $view->setPostsFrameChangedNotifications(true);
         $this->adoptNative($view);
-
-        $self = WeakReference::create($this);
-        $this->watching = NSNotificationCenter::defaultCenter()->addObserverForNameObjectQueueUsingBlock(
-            NSViewFrameDidChangeNotification,
-            $view,
-            NSOperationQueue::mainQueue(),
-            static function () use ($self): void {
-                $self->get()?->widthChanged();
-            },
-        );
 
         $this->showPicture($image);
         $this->applyScaling($this->scaling());
@@ -109,14 +86,6 @@ class AppkitImage extends TKImage
 
     protected function releaseNative(): void
     {
-        if (! is_null($this->watching)) {
-            NSNotificationCenter::defaultCenter()->removeObserver($this->watching);
-            $this->watching = null;
-        }
-        if (! is_null($this->refit)) {
-            $this->refit[0]->invalidate();
-            $this->refit = null;
-        }
         NSLayoutConstraint::deactivateConstraints($this->natural);
         $this->natural = [];
         $this->releaseView();
@@ -138,44 +107,16 @@ class AppkitImage extends TKImage
         }
 
         $size = $this->image->size();
-        $height = $this->scaling() === ImageScaling::FIT && $this->fit_width > 0.0 && $size->width > 0.0
-            ? $this->fit_width * $size->height / $size->width
-            : $size->height;
-
         $view = $this->native();
-        $this->natural = [$view->widthAnchor()->constraintEqualToConstant($size->width), $view->heightAnchor()->constraintEqualToConstant($height)];
+        $width = $view->widthAnchor()->constraintEqualToConstant($size->width);
+        $height = $this->scaling() === ImageScaling::FIT && $size->width > 0.0
+            ? $view->heightAnchor()->constraintEqualToAnchorMultiplier($view->widthAnchor(), $size->height / $size->width)
+            : $view->heightAnchor()->constraintEqualToConstant($size->height);
+        $this->natural = [$width, $height];
         foreach ($this->natural as $constraint) {
             $constraint->setPriority(485.0);
         }
         NSLayoutConstraint::activateConstraints($this->natural);
-    }
-
-    /**
-     * The frame changes inside a layout pass, where a constraint swapped moves nothing.
-     */
-    private function widthChanged(): void
-    {
-        if ($this->isRemoved()) {
-            return;
-        }
-        $width = $this->native()->frame()->width;
-        if (abs($width - $this->fit_width) < 0.5) {
-            return;
-        }
-        $this->fit_width = $width;
-        if ($this->scaling() !== ImageScaling::FIT || ! is_null($this->refit)) {
-            return;
-        }
-
-        $self = WeakReference::create($this);
-        $target = new ObjCTarget(static function () use ($self): void {
-            $image = $self->get();
-            if (! is_null($image) && ! $image->isRemoved()) {
-                $image->refit = null;
-                $image->measure();
-            }
-        });
-        $this->refit = [NSTimer::scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(0.0, $target, ObjCTarget::ACTION, null, false), $target];
     }
 
     /**

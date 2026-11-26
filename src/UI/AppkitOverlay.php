@@ -28,6 +28,10 @@ use Jovian\Toolkits\Appkit\UI\Concerns\AppkitPlacesChildren;
  * its compression resistance drops to 1 on both axes (put back as it was when it stops), so
  * its content cannot push the overlay, and a picture there drops its natural size (AppkitImage).
  *
+ * A child with a maximum length on an axis where it fills or is FILL-aligned takes the room
+ * up to its maximum (a 495 pull under the required ceiling), placed by its Align there (FILL
+ * read as START).
+ *
  * A hidden child sizes nothing: its constraints go while it is hidden (its frame is then
  * AppKit's to leave), and come back when it is shown.
  *
@@ -234,10 +238,15 @@ class AppkitOverlay extends TKOverlay
         $constraints = [];
         $bases = [];
         foreach ([[true, $fillsH, $alignH, $padding->left + $margin->left, $padding->right + $margin->right], [false, $fillsV, $alignV, $padding->top + $margin->top, $padding->bottom + $margin->bottom]] as [$horizontal, $fills, $align, $before, $after]) {
-            $align = $fills ? Align::FILL : $align;
-            $pull = self::hug($view, $horizontal, $align !== Align::FILL);
+            $max = $child->maximumSize()[$horizontal ? 0 : 1];
+            $capped = $max > 0 && ($fills || $align === Align::FILL);
+            $align = $capped ? self::cappedAlign($align) : ($fills ? Align::FILL : $align);
+            $pull = self::hug($view, $horizontal, ! $capped && $align !== Align::FILL);
             if (! is_null($pull)) {
                 $constraints[] = $pull;
+            }
+            if ($capped) {
+                $constraints[] = self::roomPull(self::lengthOn($view, $horizontal), self::lengthOn($overlay, $horizontal), (float) $before, (float) $after);
             }
             foreach (self::alignOn(self::anchorsOn($view, $horizontal), self::anchorsOn($overlay, $horizontal), $align, (float) $before, (float) $after) as $edge) {
                 $constraints[] = $edge;

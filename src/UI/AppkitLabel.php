@@ -2,13 +2,17 @@
 
 namespace Jovian\Toolkits\Appkit\UI;
 
+use NSRange;
 use NSColor;
 use NSTextField;
+use NSFontManager;
 use NSLineBreakMode;
+use NSMutableAttributedString;
 use NSLayoutConstraintOrientation;
 use Surface\NutsAndBolts\Color;
 use Surface\Toolkits\UI\TKLabel;
 use Surface\Contracts\Toolkits\Styling\FontSpec;
+use Surface\Contracts\Toolkits\Styling\TextRun;
 use Surface\Contracts\Toolkits\Styling\TextAlignment;
 use Jovian\Toolkits\Appkit\UI\Concerns\AppkitText;
 use Jovian\Toolkits\Appkit\UI\Concerns\AppkitNative;
@@ -21,6 +25,14 @@ use Jovian\Toolkits\Appkit\UI\Concerns\TakesInputFromAbove;
  * compression resistance drops to 490, below a window's size-stay-put (500), so a narrow
  * window wraps it instead of widening. Unwrapping and a null colour restore what AppKit built
  * the label with.
+ *
+ * Runs are the field's attributed string: the whole text in the label's font and colour, then
+ * each run's range (in UTF-16 units, as NSString counts) given the label's font with the bold
+ * or italic trait (NSFontManager) and its own colour. No paragraph style is written, so the
+ * field's own alignment and line breaking (wrapping) still apply. The field's font, colour and
+ * alignment setters rewrite the whole attributed string, so while there are runs every such
+ * change sets the field and then writes the runs again; new plain text (setText) is the
+ * field's plain string again.
  */
 class AppkitLabel extends TKLabel
 {
@@ -35,6 +47,9 @@ class AppkitLabel extends TKLabel
     private ?NSColor $built_color;
 
     private float $built_resistance;
+
+    /** @var list<TextRun> the runs shown; empty while the text is plain */
+    private array $runs = [];
 
     protected function bootstrapNative(): void
     {
@@ -51,7 +66,14 @@ class AppkitLabel extends TKLabel
 
     protected function applyText(string $text): void
     {
+        $this->runs = [];
         $this->labelNative()->setStringValue($text);
+    }
+
+    protected function applyRuns(array $runs): void
+    {
+        $this->runs = $runs;
+        $this->writeRuns();
     }
 
     /**
@@ -70,21 +92,82 @@ class AppkitLabel extends TKLabel
     protected function applyAlignment(TextAlignment $alignment): void
     {
         $this->labelNative()->setAlignment(self::nsAlignment($alignment));
+        $this->writeRuns();
     }
 
     protected function applyFont(FontSpec $font): void
     {
         $this->labelNative()->setFont(self::nsFont($font));
+        $this->writeRuns();
     }
 
     protected function applyTextColor(?Color $color): void
     {
         $this->labelNative()->setTextColor(is_null($color) ? $this->built_color : self::nsColor($color));
+        $this->writeRuns();
     }
 
     protected function applyNativeEnabled(bool $takes_input): void
     {
         $this->labelNative()->setEnabled($takes_input);
+    }
+
+    /**
+     * The runs as the field's attributed string, over the field's own font and colour. Nothing
+     * while the text is plain.
+     */
+    private function writeRuns(): void
+    {
+        if ($this->runs === []) {
+            return;
+        }
+
+        $label = $this->labelNative();
+        $font = $label->font();
+        $color = $label->textColor();
+        $base = [];
+        if (! is_null($font)) {
+            $base[NSFontAttributeName] = $font;
+        }
+        if (! is_null($color)) {
+            $base[NSForegroundColorAttributeName] = $color;
+        }
+
+        $styled = NSMutableAttributedString::initWithStringAttributes(TextRun::join($this->runs), $base);
+        $at = 0;
+        foreach ($this->runs as $run) {
+            $length = self::utf16Length($run->text);
+            $range = new NSRange($at, $length);
+            $at += $length;
+            if ($length === 0) {
+                continue;
+            }
+
+            if (! is_null($font) && ($run->bold || $run->italic)) {
+                $manager = NSFontManager::sharedFontManager();
+                $face = $font;
+                if ($run->bold) {
+                    $face = $manager->convertFontToHaveTrait($face, NSBoldFontMask);
+                }
+                if ($run->italic) {
+                    $face = $manager->convertFontToHaveTrait($face, NSItalicFontMask);
+                }
+                $styled->addAttributeValueRange(NSFontAttributeName, $face, $range);
+            }
+            if (! is_null($run->color)) {
+                $styled->addAttributeValueRange(NSForegroundColorAttributeName, self::nsColor($run->color), $range);
+            }
+        }
+
+        $label->setAttributedStringValue($styled);
+    }
+
+    /**
+     * NSString's length: UTF-16 code units (an emoji outside the Basic Multilingual Plane is 2).
+     */
+    private static function utf16Length(string $text): int
+    {
+        return intdiv(strlen(mb_convert_encoding($text, 'UTF-16LE', 'UTF-8')), 2);
     }
 
     private function labelNative(): NSTextField

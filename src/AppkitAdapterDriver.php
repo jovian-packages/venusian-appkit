@@ -64,6 +64,8 @@ use Surface\Contracts\Toolkits\UI\TKImage;
 use Jovian\Toolkits\Appkit\UI\AppkitImage;
 use Surface\Contracts\Toolkits\UI\TKOverlay;
 use Jovian\Toolkits\Appkit\UI\AppkitOverlay;
+use Surface\Contracts\Toolkits\UI\TKWebView;
+use Jovian\Toolkits\Appkit\UI\AppkitWebView;
 
 class AppkitAdapterDriver extends ToolkitAdapterDriver
 {
@@ -101,6 +103,7 @@ class AppkitAdapterDriver extends ToolkitAdapterDriver
         TKTree::class => AppkitTree::class,
         TKTextArea::class => AppkitTextArea::class,
         TKOverlay::class => AppkitOverlay::class,
+        TKWebView::class => AppkitWebView::class,
     ];
 
     public function __construct(

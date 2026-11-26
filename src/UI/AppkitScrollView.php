@@ -3,6 +3,10 @@
 namespace Jovian\Toolkits\Appkit\UI;
 
 use NSRect;
+use NSObject;
+use WeakReference;
+use NSNotificationCenter;
+use Surface\Contracts\Toolkits\Styling\ScrollPosition;
 use NSScrollView;
 use NSLayoutConstraint;
 use Surface\Toolkits\UI\TKPrimitive;
@@ -31,11 +35,26 @@ class AppkitScrollView extends TKScrollView
     /** @var list<NSLayoutConstraint> */
     private array $document = [];
 
+    /** Hears the clip view's bounds change: a scroll. */
+    private ?NSObject $scroll_observer = null;
+
     protected function bootstrapNative(): void
     {
         $scroll = NSScrollView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0));
         $scroll->setDrawsBackground(false);
         $this->adoptNative($scroll);
+
+        // A scroll moves the clip view's bounds; AppKit posts that only when asked.
+        $clip = $scroll->contentView();
+        $clip->setPostsBoundsChangedNotifications(true);
+        $this->scroll_observer = NSNotificationCenter::defaultCenter()->addObserverForNameObjectQueueUsingBlock(
+            NSViewBoundsDidChangeNotification,
+            $clip,
+            null,
+            (static fn (WeakReference $self) => static function () use ($self): void {
+                $self->get()?->scrolled();
+            })(WeakReference::create($this)),
+        );
         $this->applyScrollbars($this->scrollsAcross(), $this->scrollsDown());
     }
 
@@ -75,8 +94,34 @@ class AppkitScrollView extends TKScrollView
         $this->tellExpansion();
     }
 
+    /**
+     * The clip view's bounds against the document's frame, both in the clip view's own
+     * coordinates. The pinned document's frame does not start at zero there, so offsets are
+     * taken from its edges; a clip view that is not flipped counts y from the bottom, and the
+     * top of what shows is then the document's far edge less the bounds' far edge.
+     */
+    protected function nativeScrollPosition(): ScrollPosition
+    {
+        $document = $this->scrollNative()->documentView();
+        if (is_null($document)) {
+            return new ScrollPosition(0.0, 0.0, 1.0, 1.0);
+        }
+        $clip = $this->scrollNative()->contentView();
+        $visible = $clip->bounds();
+        $content = $document->frame();
+        $top = $clip->isFlipped()
+            ? $visible->y - $content->y
+            : ($content->y + $content->height) - ($visible->y + $visible->height);
+
+        return ScrollPosition::of($visible->x - $content->x, $visible->width, $content->width, $top, $visible->height, $content->height);
+    }
+
     protected function releaseNative(): void
     {
+        if (! is_null($this->scroll_observer)) {
+            NSNotificationCenter::defaultCenter()->removeObserver($this->scroll_observer);
+            $this->scroll_observer = null;
+        }
         NSLayoutConstraint::deactivateConstraints($this->document);
         $this->document = [];
         $this->releaseView();

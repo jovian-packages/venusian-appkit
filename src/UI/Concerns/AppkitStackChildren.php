@@ -41,6 +41,16 @@ use Surface\Contracts\Toolkits\UI\Insets;
  *    for it.
  *  - Along the axis, a filling child with START, CENTER or END there still takes its whole
  *    share: placing it inside that share would need a view around it.
+ *  - Homogeneous (setHomogeneous()): the distribution is FILL_EQUALLY and every shown child is
+ *    tied to the first along the axis at 999 (FILL_EQUALLY's own ties give way to a wrapping
+ *    label's compression and a view's pull to zero, measured), so every shown child has the
+ *    same length and they fill the stack, whatever each one's natural length; the stack's
+ *    natural length is the longest child's times their number. Hidden children are out of
+ *    the arrangement, so they share nothing. Off, it is as above.
+ *  - Across the axis, a child with a maximum width (column) or height (row) that wants its
+ *    room (FILL-aligned, or filling that way) takes the room up to its maximum: a pull at 495
+ *    toward the room's length under the required ceiling, placed by its Align (FILL read as
+ *    START), so a CENTER child is centred once the room is wider.
  */
 trait AppkitStackChildren
 {
@@ -134,6 +144,15 @@ trait AppkitStackChildren
     }
 
     /**
+     * Every shown child the same length along the axis (NSStackViewDistribution FILL_EQUALLY
+     * and ties at 999); off, the distribution follows the fillers again.
+     */
+    protected function applyHomogeneous(bool $on): void
+    {
+        $this->settle();
+    }
+
+    /**
      * fill(), align() or the margin changed on a child, or whether something inside it fills.
      */
     protected function childLayoutChanged(TKPrimitive $child): void
@@ -173,8 +192,10 @@ trait AppkitStackChildren
         $constraints = [];
         // Along the axis: grows only while it fills.
         $pull = self::hug($view, ! $vertical, ! self::fillsAlong($child, ! $vertical));
-        // Across the axis: grows only with FILL.
-        $pullAcross = self::hug($view, $vertical, $across !== Align::FILL);
+        // Across the axis: grows only with FILL, or up to its maximum where it wants its room.
+        $maxAcross = $child->maximumSize()[$vertical ? 0 : 1];
+        $capped = $maxAcross > 0 && ($across === Align::FILL || $child->fills()[$vertical ? 0 : 1]);
+        $pullAcross = self::hug($view, $vertical, ! $capped && $across !== Align::FILL);
         foreach ([$pull, $pullAcross] as $made) {
             if (! is_null($made)) {
                 $constraints[] = $made;
@@ -182,7 +203,12 @@ trait AppkitStackChildren
         }
 
         // Across the axis, by its Align, inside the padding and margin on those two sides.
-        array_push($constraints, ...self::alignOn(self::anchorsOn($view, $vertical), self::anchorsOn($stack, $vertical), $across, $before, $after));
+        if ($capped) {
+            array_push($constraints, ...self::alignOn(self::anchorsOn($view, $vertical), self::anchorsOn($stack, $vertical), self::cappedAlign($across), $before, $after));
+            $constraints[] = self::roomPull(self::lengthOn($view, $vertical), self::lengthOn($stack, $vertical), $before, $after);
+        } else {
+            array_push($constraints, ...self::alignOn(self::anchorsOn($view, $vertical), self::anchorsOn($stack, $vertical), $across, $before, $after));
+        }
 
         NSLayoutConstraint::activateConstraints($constraints);
         $this->placed[$child->uuid()] = $constraints;
@@ -205,9 +231,32 @@ trait AppkitStackChildren
             }
         }
 
-        $this->stackNative()->setDistribution($fillers === [] ? NSStackViewDistribution::GRAVITY_AREAS : NSStackViewDistribution::FILL);
+        $this->stackNative()->setDistribution(match (true) {
+            $this->isHomogeneous() => NSStackViewDistribution::FILL_EQUALLY,
+            $fillers === [] => NSStackViewDistribution::GRAVITY_AREAS,
+            default => NSStackViewDistribution::FILL,
+        });
 
-        foreach (array_slice($fillers, 1) as $filler) {
+        // Homogeneous: every shown child tied to the first at 999. FILL_EQUALLY's own ties sit
+        // below a wrapping label's compression (490) and a view's pull to zero (480): alone it
+        // left a long-text card wider and a short column shorter (measured).
+        if ($this->isHomogeneous()) {
+            $shown = [];
+            foreach ($this->children() as $child) {
+                if (! $child->isRemoved() && $child->isVisible() && isset($this->placed[$child->uuid()])) {
+                    $shown[] = $child->native();
+                }
+            }
+            foreach (array_slice($shown, 1) as $view) {
+                $tie = $vertical
+                    ? $view->heightAnchor()->constraintEqualToAnchor($shown[0]->heightAnchor())
+                    : $view->widthAnchor()->constraintEqualToAnchor($shown[0]->widthAnchor());
+                $tie->setPriority(999.0);
+                $this->ties[] = $tie;
+            }
+        }
+
+        foreach ($this->isHomogeneous() ? [] : array_slice($fillers, 1) as $filler) {
             $tie = $vertical
                 ? $filler->heightAnchor()->constraintEqualToAnchor($fillers[0]->heightAnchor())
                 : $filler->widthAnchor()->constraintEqualToAnchor($fillers[0]->widthAnchor());

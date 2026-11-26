@@ -5,7 +5,7 @@ description: The AppKit column, row, fixed, label, button, check box, switch and
 resource: src/UI/
 tags: [appkit, primitives]
 status: draft
-generated: { by: claude-opus/5.5, at: 2026-11-25T21:00:00Z }
+generated: { by: claude-opus/5.5, at: 2026-11-26T01:00:00Z }
 sources:
   - id: native
     resource: src/UI/Concerns/AppkitNative.php
@@ -23,13 +23,13 @@ sources:
 
 # Classes
 
-Each extends Topside's class (`TKColumn`, `TKRow`, `TKFixed`, `TKLabel`, `TKButton`, `TKCheckbox`, `TKToggle`, `TKDropdown`, `TKTextInput`, `TKComboBox`, `TKDatepicker`, `TKLink`, `TKSeparator`, `TKProgressBar`, `TKSpinner`, `TKSlider`, `TKToggleButton`, `TKSegmentedControl`, `TKImage`, `TKScrollView`, `TKTabView`, `TKSplitView`, `TKGrid`, `TKTable`, `TKTextArea`, `TKListView`, `TKCollectionView`, `TKTree`, `TKOverlay`) and fills in its hooks; the driver's `$primitives` map names them. Fonts and alignment of what shows text are in `AppkitText`. Shared native work is in `AppkitNative`, what column and row share in `AppkitStackChildren`.[^native]
+Each extends Topside's class (`TKColumn`, `TKRow`, `TKFixed`, `TKLabel`, `TKButton`, `TKCheckbox`, `TKToggle`, `TKDropdown`, `TKTextInput`, `TKComboBox`, `TKDatepicker`, `TKLink`, `TKSeparator`, `TKProgressBar`, `TKSpinner`, `TKSlider`, `TKToggleButton`, `TKSegmentedControl`, `TKImage`, `TKScrollView`, `TKTabView`, `TKSplitView`, `TKGrid`, `TKTable`, `TKTextArea`, `TKListView`, `TKCollectionView`, `TKTree`, `TKOverlay`, `TKWebView`) and fills in its hooks; the driver's `$primitives` map names them. Fonts and alignment of what shows text are in `AppkitText`. Shared native work is in `AppkitNative`, what column and row share in `AppkitStackChildren`.[^native]
 
 | Class | Native |
 |---|---|
 | `AppkitColumn`, `AppkitRow` | `NSStackView` with spacing and edge insets; a child's alignment as constraints, its fill as hugging priority and the distribution, re-settled when a child is shown or hidden |
 | `AppkitFixed` | plain `NSView`: children framed with `setFrame`, top-left based against the unflipped view, re-framed when it resizes; the larger of frame and minimum; its floor covers every frame |
-| `AppkitLabel` | `NSTextField::labelWithString`, left-aligned at build; colour null restores the colour read at build |
+| `AppkitLabel` | `NSTextField::labelWithString`, left-aligned at build; colour null restores the colour read at build; runs as its attributed string (below) |
 | `AppkitButton` | `NSButton` with an `ObjCTarget` (held weakly) that calls `clicked()`; in the Tab order only with Full Keyboard Access on, as macOS does; style, colour, icon and role below |
 | `AppkitCheckbox` | `NSButton::checkboxWithTitleTargetAction`; its action (the user's toggle only) reports the new state |
 | `AppkitToggle` | `NSSwitch`; its action reports the new state |
@@ -45,7 +45,7 @@ Each extends Topside's class (`TKColumn`, `TKRow`, `TKFixed`, `TKLabel`, `TKButt
 | `AppkitToggleButton` | push-on, push-off `NSButton` |
 | `AppkitSegmentedControl` | `NSSegmentedControl`, select-one |
 | `AppkitImage` | layer-backed view (`NSImageView` cannot cover); natural size at priority 485, a FIT height set again as the width changes (no aspect constraint is bound) |
-| `AppkitScrollView` | `NSScrollView`; the document pinned to the clip view's top, at least its size along what scrolls |
+| `AppkitScrollView` | `NSScrollView`; a scroll is the clip view's bounds changing (`NSViewBoundsDidChangeNotification`), the position its bounds against the document's frame, both in the clip view's coordinates (the pinned document's frame does not start at zero there, and a clip view that is not flipped counts from the bottom); the document pinned to the clip view's top, at least its size along what scrolls |
 | `AppkitTabView` | `NSTabView`, pages pinned inside their items; kept at least strip and largest page at priority 488; a disabled one refuses the click in `shouldSelectTabViewItem` |
 | `AppkitSplitView` | `NSSplitView`; the divider is a width or height constraint at 489 (under Auto Layout `setPositionOfDividerAtIndex` lasts only until the next layout), updated through a drag |
 | `AppkitGrid` | `NSGridView` in a plain view, built again when cells change (merged cells cannot be unmerged); a FILL child hugs at 250, or 1 where its line expands (at 750 a spanning button held every container above to its width) |
@@ -54,6 +54,7 @@ Each extends Topside's class (`TKColumn`, `TKRow`, `TKFixed`, `TKLabel`, `TKButt
 | `AppkitListView` | view-based `NSTableView`; Return and double click activate |
 | `AppkitCollectionView` | `NSCollectionView` flow layout; a click activates |
 | `AppkitTree` | `NSOutlineView`; descendants AppKit closes and reopens with their ancestor are told from the user's |
+| `AppkitWebView` | `WKWebView` (`initWithFrameConfiguration`, a fresh `WKWebViewConfiguration`); `load` → `loadRequest`, `loadHtml` → `loadHTMLStringBaseURL` (base URL null when none), `reload`, `stopLoading`; see Web view |
 | `AppkitOverlay` | layer-backed plain `NSView`, children as subviews in order (the first at the back). Each child placed on both axes by its Align, or FILL where it fills, inside padding and margin, with the stack's constraints (`AppkitPlacesChildren`); see below |
 
 # Look and layout settings
@@ -70,7 +71,8 @@ Topside's optional hooks are overridden only where AppKit shows the setting itse
 | Tooltip | `NSView::setToolTip` |
 | Border | The layer's `borderWidth` and `borderColor`, inside the bounds; a null colour is `NSColor::separatorColor`, the system line colour, resolved when the border is set (a layer keeps a CGColor, which does not follow a later appearance change). Width 0 takes it away |
 | Cursor | `AppkitPointer`: an `NSTrackingArea` (cursor update, enter and exit, visible rect, active app) owned by the view, one shared local monitor. A cursor update or enter with the pointer inside sets the `NSCursor` (the update is taken, so the owner's `cursorUpdate:` does not reset it); the update on leaving goes to AppKit, which shows its arrow again. ARROW arrow, POINTER pointing hand, TEXT I-beam, CROSSHAIR crosshair, GRAB open hand, GRABBING closed hand, NOT_ALLOWED operation-not-allowed, RESIZE_HORIZONTAL / RESIZE_VERTICAL resize left-right / up-down, RESIZE_NWSE / RESIZE_NESW `frameResizeCursorFromPositionInDirections` top-left / top-right, all directions. A text field shows a cursor set on it while not editing |
-| Button style | DEFAULT bordered; BORDERLESS and LINK `setBordered(false)` (no bezel inset: `size()`, the frame, is then the title and icon); LINK's title in `NSColor::linkColor`, its pointing hand through the cursor |
+| Button padding | `AppkitButton::refit()`: width and height constraints equal to `intrinsicContentSize` plus left+right and top+bottom, at priority 800 (over a stack's 750 hugging, under a required constraint or a tie at 999). Made again after every title rebuild (label, style, font, colour, alignment) and after icon and icon position; `Insets::none()` removes them. NSButton has no content insets (not in the SDK header) and the cell centres its title in the frame, so uneven left/right (or top/bottom) padding comes out as an even split of the total: AppKit has no per-side inset and none is faked. While padded the button also sets `imageHugsTitle` (ext-appkit 7315842), so title and icon are one centred group; unpadded it stays off, as AppKit's own button |
+| Button style | DEFAULT bordered; HELP bordered with `NSBezelStyle::HELP_BUTTON`, AppKit's round "?" (20 x 20 whatever the title, which it does not draw; the bezel the button was made with comes back with any other style); BORDERLESS and LINK `setBordered(false)` (no bezel inset: `size()`, the frame, is then the title and icon); LINK's title in `NSColor::linkColor`, its pointing hand through the cursor |
 | Button text colour | An attributed title with `NSForegroundColorAttributeName`, the button's font and alignment, plus `contentTintColor` (colours a symbol icon too); no colour writes the plain title again. Every label, style, font, colour and alignment change writes the title, so `setTitle` never drops the colour |
 | Button font, alignment | `NSControl::setFont`, `setAlignment` |
 | Button icon | `NSImage::initWithContentsOfFile` (a file wins when AppKit reads it), else `imageWithSystemSymbolNameAccessibilityDescription`; `IMAGE_LEADING`; none `NO_IMAGE` |
@@ -101,6 +103,45 @@ Left unshown on AppKit:
 * **Hidden children** have no constraints while hidden, so they size nothing; their frame is AppKit's to leave meanwhile, and they are placed again when shown.
 * `ImageScaling::FILL` in an overlay covers and crops: on a 620x320 overlay a 3200x2000 picture shows a 43.5-point top band where cover-and-crop predicts 43.8 and stretching 64.
 
+# Homogeneous columns and rows
+
+* `applyHomogeneous()`: the stack's distribution is `FILL_EQUALLY`, and every shown child is tied to the first along the axis at 999. `FILL_EQUALLY` alone did not hold: its own ties gave way to a wrapping label's compression resistance (490) and a view's pull to zero (480), so a long-text card stayed 902 wide beside a 54-wide short one, and a column's children kept their own heights (measured). Off, the distribution follows the fillers again (FILL with ties at 200, or GRAVITY_AREAS) and each child has its own length.
+* It composes with the rest of the stack: margins and custom spacing stay between the equal children, a hidden child is out of the arrangement and shares nothing, and across the axis placement is unchanged.
+* Measured: two filling cards in a 968-point row, one with a long wrapping label, are 478 and 478 (902 and 54 when off); 288 and 288 in a narrower window; a margin after the first keeps them equal with a 22-point gap; a column of a four-line and a one-line child gives both 76 high (76 and 28 when off), the column 160 high, no spare room taken.
+
+# Label runs
+
+* `applyRuns()`: an `NSMutableAttributedString` of the joined text in the field's font and text colour, then per run, over its range in UTF-16 units (NSString's length: an emoji outside the BMP is 2), the field's font with the bold and/or italic trait (`NSFontManager convertFont:toHaveTrait:`) and its colour. No paragraph style is written, so the field's own alignment and line breaking (wrapping) still apply.
+* The field's font, colour and alignment setters rewrite the whole attributed string, so with runs each change sets the field, then writes the runs again: a new font keeps the bold run bold at the new size, a new colour reaches the plain runs and not a coloured one. `setText()` is the field's plain string again.
+* A colour emoji draws in its own colours whatever the run's colour (AppKit's).
+
+# Maximum size
+
+* `applyMaxSize()`: required `width <=` / `height <=` constraints on the view (0: none that way); a child of a fixed has its frame capped instead.
+* In a column or row (across the axis) and in an overlay (each axis), a child with a maximum that wants its room there (it fills, or is FILL-aligned) is placed by its Align with FILL read as START, plus a pull at 700 toward the room's length (above the 480 pull to zero, below hugging and compression at 750 and the required ceiling): as wide as the room up to its maximum, then at its side, or centred when CENTER. Measured: a 768-max filling CENTER column in a 1168-point room is 768 wide and centred; in a 568 room it is 568; END sits at the trailing side, FILL at the leading.
+
+# Web view
+
+* `AppkitWebView` holds an `ObjCDelegate('WKNavigationDelegate')` strongly (WebKit's delegate is weak); its closures hold the primitive through a `WeakReference`. `didFinishNavigation:` → `loaded()`; `didFailNavigation:withError:` and `didFailProvisionalNavigation:withError:` → `failed()` with `NSError::localizedDescription`. The URL in the mail is the view's own, else the last one asked for (a provisional failure leaves the view's `URL` null). `releaseNative()` clears the delegate first, then `stopLoading()`, so a removed view posts nothing.
+* `url()` (`URL()?->absoluteString()`), `title()` (`''` is null) and `isLoading()` are read from the view, live. `supported()` is true.
+* A `WKWebView` has no intrinsic size: in a column it is as high as the room gives it, 0 in an unconstrained one, so give it a `minSize()`.
+* Embeds that check the page's origin (YouTube's player answered "Error 153" to a page without one) work through `loadHtml()` with a base URL: the iframe sees that origin.
+* `reload()` of a `loadHtml()` page reloads its base URL, as WebKit does, not the HTML.
+
+# Button padding
+
+`refit()` reads `intrinsicContentSize` after the title or icon changed, so padding survives label changes. Even split: left and right padding of 4 and 28 gave the same 32 wider button as 16 and 16 (measured).
+
+`imageHugsTitle` is on while the button is padded and off otherwise. Off, AppKit's cell pins an icon to its edge and centres only the title in the rest (a 108-wide trailing-arrow button of intrinsic 76: title x 0..91, arrow 93..108, flush right). It is not turned on for every button: it would regroup the icon of a stretched, unpadded button, which AppKit's own button keeps at the edge. On, title and icon are one group centred in the button (title 18..73, arrow 75..90).
+
+# Button icon position
+
+`applyIconPosition()`: `IMAGE_TRAILING` for TRAILING, `IMAGE_LEADING` otherwise; `applyIcon()` uses the same choice, so it holds through new labels, colours (attributed title) and symbols.
+
+# FIT pictures
+
+A FIT picture's natural height is `heightAnchor = widthAnchor × h/w` (`constraintEqualToAnchorMultiplier`, ext-appkit f95d01d) at 485, beside its natural width: the height follows the width in the same layout pass (the frame-change observer and the next-turn re-measure are gone). FILL, CENTER and STRETCH keep the picture's size in points (a 400×200 pixel PNG at 96 dpi is 300×150 points). Measured in a vertical scroll view whose column is the clip view's width: height = width / 2 after one `layoutSubtreeIfNeeded`, and again after the window narrows.
+
 # Clickable groups
 
 * `applyClickable()` (every group, in `AppkitNative`): an `NSClickGestureRecognizer` on the group's view, primary button, one click, `delaysPrimaryMouseButtonEvents` off, with an `ObjCTarget` the primitive keeps (AppKit does not retain a recognizer's target); off and at release it is removed. Its action reads `locationInView:` and calls `groupClicked()` with x, y from the top-left: an unflipped view's y is its height less AppKit's.
@@ -112,6 +153,7 @@ Left unshown on AppKit:
 * `MOVE_RIGHT`, `MOVE_LEFT`, `MOVE_TOP`, `MOVE_BOTTOM` play only for a child of an overlay, which keeps the child's constraints and their own constants (`bases`). While the move runs the overlay holds the child: placed even while hidden, its constraint constants offset by the move, and neither its visibility change nor a layout change puts it back.
 * Appearing: shown at full opacity, placed, laid out (its size), offset one own width or height toward the edge and laid out again; one frame later an `NSAnimationContext` group (duration `$seconds`, `allowsImplicitAnimation`, timing function `CAMediaTimingFunction::functionWithControlPoints()` on Topside's `curve(true)`, `MOVE_IN_CURVE` [0.22, 1, 0.36, 1], easeOutQuint) sets the offsets to 0 and lays out, and AppKit animates the frames. Disappearing: the group, on `curve(false)` (`MOVE_OUT_CURVE` [0.64, 0, 0.78, 0], easeInQuint, the same motion backwards), offsets it out to the edge, and the landing timer hides it and lets the overlay place it as it is (hidden: unplaced). No fade either way. A new `setVisible()` mid-move stops the move and places the child, then plays from there.
 * Measured on a 620-point full-overlay drawer over 1 s, against the curve over each capture's time span: appearing, 0.91 to 0.93 of the way in at 0.30–0.46 s (the curve 0.80–0.93; plain easeOut would be 0.41–0.60), 0.99 at 0.6–0.74 s, landed by 0.9 s; disappearing, 0.02 out at 0.31–0.46 s, 0.18 to 0.21 at 0.6–0.76 s (plain easeIn 0.44–0.62), 0.57 to 0.62 at 0.81–0.92 s, then hidden. FADE and SLIDE keep AppKit's own curve: the fade's presentation opacity reads 0.06, 0.26, 0.5, 0.67 … 1 every 0.1 s, as before. LEFT, TOP and BOTTOM come from their sides. A hidden drawer takes no clicks, and a page's click and cursor under it work again.
+* A primitive added while its window is on screen and built visible (Topside's `playAppear()`) plays the same path: the overlay holds and places it, lays it out, offsets it out to the edge, and the group brings it in. Measured: a drawer pushed by a click over a shown one is 0.91 to 0.93 of the way in at about 0.45 s of 1 s (the same as a hide/show toggle), the drawer under it showing at its left, and lands on top at its place.
 * Unshown: a move anywhere else (column, row, grid, fixed, scroll view, tab view, split view): the container positions the view itself, and an offset frame would be put back by the next layout pass, so the view is shown or hidden at once.
 
 # Cursor under a covering view
@@ -141,6 +183,12 @@ The Mac App Store's sidebar field has no such line under the same setting becaus
 * `nativeFocus()` reads the first responder back (`makeFirstResponder`'s return value is not reliable). `hasFocus()`: the view, or the field editor whose delegate it is, is its window's first responder.
 
 # Checked
+
+Web view and button padding (2026-11-26, real windows through the driver, NTS and ZTS; Pest 231 on both, 8 new): `loadHtml('<title>Hello</title>…', 'https://example.test/page')` posts one `WebViewLoaded` with that URL, `url()` is it, `title()` 'Hello' (it can trail the finish by a moment), `isLoading()` false; `load('file:///nonexistent/x.html')` posts one `WebViewFailed` with the system's reason; a file page reloads and posts again; a removed view posts nothing in 1 s. The YouTube embed (the iframe HTML, base URL the NASA page, 640x360 `minSize`; without it the view was 640x0) posts `WebViewLoaded` and a window screenshot shows the player (title, play button, "Watch on YouTube"), no Error 153, on both. Padding, a borderless blue button, label 'Continue' and trailing `arrow.right`: 76x16 with none; `0 16` 108x16 (+32 wide); `8 16` 108x32 (+32, +16); label 'Continue to the next page' 210x32 (padding kept), back to 108x32; `0 4 0 28` 108x16 (even split); cleared 76x16. Hugging (ext-appkit 7315842), 'Continue' with trailing arrow in a 420x140 window at 2x, gaps measured in the screenshot from the blue button's edge to the first and last light pixel: unpadded 76 wide, title 3 pt from the left and arrow 2 pt from the right (glyph bearings); `0 16` 108 wide, 19 and 20 pt, i.e. 16 plus the same bearings; 'Continue to the next page' 210 wide, 19 and 20. Same on NTS and ZTS; the arrow is inset from the right edge. Pest 231 on both.
+
+Homogeneous (2026-11-26, a scratch real-window harness, 11 checks, all passing on NTS and ZTS; Pest 223 on both): a row of two filling cards off and on, narrower, with a margin, with one hidden; a column's equal heights; off restoring the distribution and the old lengths.
+
+Runs, maximum size, icon position, FIT and pushed drawers (2026-11-25, a scratch real-window harness, 33 checks, all passing on NTS and ZTS; Pest 223 on both): runs' fonts and colours by attribute and in a screenshot, non-ASCII ranges, font, colour, alignment and text changes after runs, wrapping with runs; the 768 column in wide and narrow rooms, END, FILL, none, an overlay child; the trailing arrow on a rounded button through label, colour and symbol changes; a FIT picture in a scroll view in one layout pass; a drawer pushed by a click and the toggle, mid-slide and landed.
 
 Move curve (2026-11-25, a scratch real-window harness, 14 checks, all passing on NTS and ZTS; Pest 223 on both): Topside's two curves; a 1 s MOVE_RIGHT in and out sampled in pixels three times each against the Bézier and against plain easeOut and easeIn; landing and hiding; FADE and SLIDE as before.
 

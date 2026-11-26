@@ -6,6 +6,7 @@ use NSView;
 use NSStackView;
 use NSLayoutAnchor;
 use NSLayoutConstraint;
+use NSLayoutDimension;
 use NSLayoutConstraintOrientation;
 use Surface\Contracts\Toolkits\UI\Align;
 
@@ -49,6 +50,39 @@ trait AppkitPlacesChildren
                 $end->constraintLessThanOrEqualToAnchorConstant($roomEnd, -$after),
             ],
         };
+    }
+
+    /**
+     * For a child with a maximum length on an axis that wants its room there (it fills, or is
+     * FILL-aligned): its Align with FILL read as START (a capped child cannot reach both
+     * edges once the room is wider), so it is placed by that edge or centred.
+     */
+    private static function cappedAlign(Align $align): Align
+    {
+        return $align === Align::FILL ? Align::START : $align;
+    }
+
+    /**
+     * The pull (not yet active) that makes a capped child as long as its room, less the space
+     * before and after: at 495, above a view's 480 pull to zero and a wrapping label's
+     * compression (490), and below a window's size-stay-put (500): it takes the room up to its
+     * maximum and never resizes the window (at 700 it narrowed the window to the child's
+     * maximum and held it there against the user's resize, 510, measured).
+     */
+    private static function roomPull(NSLayoutDimension $child, NSLayoutDimension $room, float $before, float $after): NSLayoutConstraint
+    {
+        $pull = $child->constraintEqualToAnchorConstant($room, -($before + $after));
+        $pull->setPriority(495.0);
+
+        return $pull;
+    }
+
+    /**
+     * A view's length anchor on one axis.
+     */
+    private static function lengthOn(NSView $view, bool $horizontal): NSLayoutDimension
+    {
+        return $horizontal ? $view->widthAnchor() : $view->heightAnchor();
     }
 
     /**

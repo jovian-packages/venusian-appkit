@@ -2,7 +2,12 @@
 
 namespace Jovian\Toolkits\Appkit;
 
+use NSAlert;
+use NSAlertStyle;
 use NSBackingStoreType;
+use NSControlStateValue;
+use NSURL;
+use NSWorkspace;
 use NSLayoutConstraint;
 use NSRect;
 use NSWindow;
@@ -13,6 +18,8 @@ use RuntimeException;
 use Surface\Contracts\Toolkits\Mail\Windows\WindowFocused;
 use Surface\Contracts\Toolkits\Mail\Windows\WindowScaleChanged;
 use Surface\Toolkits\ToolkitWindow;
+use Surface\Contracts\Toolkits\Dialogs\Alert;
+use Surface\Contracts\Toolkits\Dialogs\AlertStyle;
 use Surface\Contracts\Toolkits\UI\TKColumn as ColumnContract;
 
 class AppkitWindow extends ToolkitWindow
@@ -47,6 +54,9 @@ class AppkitWindow extends ToolkitWindow
 
     /** The backing scale last posted, or seen at open. */
     private ?float $backing_scale = null;
+
+    /** The NSAlert shown as a sheet on the window, until it is answered. */
+    protected ?NSAlert $alert = null;
 
     public function __construct(
         string $name,
@@ -245,6 +255,69 @@ class AppkitWindow extends ToolkitWindow
         $this->window->setDelegate(null);
         $this->window = null;
         $this->key = false;
+    }
+
+    /**
+     * An NSAlert, as a sheet on the window. The buttons go in in order, so the first is the
+     * rightmost. AppKit's key equivalents say which button Return and Esc press; one button
+     * holds one, so when the default is also the cancel button Return presses it and Esc
+     * presses none, as in every AppKit alert. No title: a sheet has none.
+     */
+    protected function showAlert(Alert $alert): void
+    {
+        $native = NSAlert::init();
+        $native->setMessageText($alert->message);
+        $native->setInformativeText($alert->detail ?? '');
+        if (! is_null($alert->style)) {
+            $native->setAlertStyle(match ($alert->style) {
+                AlertStyle::Info => NSAlertStyle::INFORMATIONAL,
+                AlertStyle::Warning => NSAlertStyle::WARNING,
+                AlertStyle::Critical => NSAlertStyle::CRITICAL,
+            });
+        }
+        if (! is_null($alert->suppression)) {
+            $native->setShowsSuppressionButton(true);
+            $native->suppressionButton()?->setTitle($alert->suppression);
+        }
+        foreach ($alert->buttons as $index => $label) {
+            // Set on every button: AppKit gives Return to the first and Esc to one titled "Cancel".
+            $native->addButtonWithTitle($label)->setKeyEquivalent(match (true) {
+                $index === $alert->default => "\r",
+                $index === $alert->cancel => "\e",
+                default => '',
+            });
+        }
+
+        $this->alert = $native;
+        $native->beginSheetModalForWindowCompletionHandler($this->live(), function (int $code) use ($native): void {
+            if ($this->alert !== $native) {
+                return;
+            }
+            $this->alert = null;
+            $this->alertAnswered(
+                $code - NSAlertFirstButtonReturn,
+                $native->showsSuppressionButton() && $native->suppressionButton()?->state() === NSControlStateValue::ON,
+            );
+        });
+    }
+
+    /** NSWorkspace opens it with the user's browser. */
+    protected function openUrl(string $url): void
+    {
+        $address = NSURL::URLWithString($url);
+        if (! is_null($address)) {
+            NSWorkspace::sharedWorkspace()->openURL($address);
+        }
+    }
+
+    /** The sheet ends before the window closes; its completion handler then finds it gone. */
+    protected function closeAlert(): void
+    {
+        $native = $this->alert;
+        $this->alert = null;
+        if (! is_null($native) && ! is_null($this->window)) {
+            $this->window->endSheetReturnCode($native->window(), NSModalResponseCancel);
+        }
     }
 
     /** The close button: AppKit closes the window unless it confirms close; then the app decides. */
