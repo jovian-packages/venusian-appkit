@@ -418,6 +418,7 @@ class AppkitMenuBar extends ToolkitMenuBar
             StandardKind::CUT => 'cut:',
             StandardKind::COPY => 'copy:',
             StandardKind::PASTE => 'paste:',
+            StandardKind::PASTE_AND_MATCH_STYLE => 'pasteAsPlainText:',
             StandardKind::SELECT_ALL => 'selectAll:',
             StandardKind::ABOUT, StandardKind::PREFERENCES, StandardKind::QUIT => null,
         };

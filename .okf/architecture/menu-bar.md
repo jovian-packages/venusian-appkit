@@ -5,7 +5,7 @@ description: One NSMenu per window and one for none key - how nodes, enabled sta
 resource: src/Menus/
 tags: [appkit, menus, macos]
 status: draft
-generated: { by: claude-opus/5.5, at: 2026-11-22T20:28:54Z }
+generated: { by: claude-opus/5.5, at: 2026-11-26T05:30:00Z }
 sources:
   - id: bar
     resource: src/Menus/AppkitMenuBar.php
@@ -30,7 +30,7 @@ sources:
 | A choice | one item per option, with its state |
 | Disabled in a menu | an item has no action; a submenu has an action its target does not answer. Submenus validate, so `setEnabled` is ignored there |
 | Disabled in the bar | `setEnabled`: the bar does not validate |
-| Edit, window and hide kinds | AppKit's selectors with no target, up the responder chain |
+| Edit, window and hide kinds | AppKit's selectors with no target, up the responder chain; Paste and Match Style is `pasteAsPlainText:` (NSTextView.h; a field editor is an NSTextView) |
 | Quit, replaced kinds, the app's items | an `ObjCTarget` calling `activated(uuid)`; it holds the bar weakly |
 | About panel | `AppkitSession::showAbout()`. A field not given is an empty string, else AppKit shows the PHP binary's; credits are an `NSAttributedString` |
 

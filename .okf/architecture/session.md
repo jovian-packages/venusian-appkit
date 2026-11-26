@@ -5,7 +5,7 @@ description: NSApplication launched once, Dock presence while connected, an even
 resource: src/Appkit.php
 tags: [appkit, session, macos]
 status: draft
-generated: { by: claude-opus/5.5, at: 2026-11-22T20:28:54Z }
+generated: { by: claude-opus/5.5, at: 2026-11-26T05:30:00Z }
 sources:
   - id: appkit
     resource: src/Appkit.php
@@ -25,7 +25,7 @@ Three classes, on Topside's toolkit layer:
 | Class | Extends / implements | Job |
 |---|---|---|
 | `AppkitAdapterDriver` | `Surface\Toolkits\Drivers\ToolkitAdapterDriver` | refuses off macOS and without ext-appkit; declares `AppkitWindow` as its window class |
-| `AppkitSession` | `Surface\Toolkits\ToolkitSession` | builds the `Appkit` toolkit once: delegate, then `finishLaunching()` |
+| `AppkitSession` | `Surface\Toolkits\ToolkitSession` | builds the `Appkit` toolkit once: delegate, then `finishLaunching()`; then `applyColorScheme()` sets `NSApplication.appearance` to `NSAppearance appearanceNamed:` `NSAppearanceNameDarkAqua` (dark) or `NSAppearanceNameAqua` (light), nil for system (needs ext-appkit 0d3836f) |
 | `Appkit` | `Surface\Contracts\Toolkits\Toolkit` | the AppKit calls below |
 
 The window list and the after-pump settle are Topside's (`ToolkitSession`).[^session]

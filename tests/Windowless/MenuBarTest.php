@@ -315,6 +315,17 @@ it('edits the focused text input with the edit items\' actions', function (): vo
         ->and($editor->selectedRange()->length)->toBe(5);
 });
 
+it('gives Paste and Match Style the text view\'s plain-text paste, which a text view answers', function (): void {
+    $menus = quietMenus();
+    $this->opened[] = quietWindow($menus, MenuBar::make(Menu::make('Edit', 'edit', Standard::pasteAndMatchStyle())));
+    $item = nativeItem('Edit', '#0');
+    $area = NSTextView::scrollableTextView()->documentView();
+
+    expect($item->action())->toBe('pasteAsPlainText:')
+        ->and($item->target())->toBeNull()
+        ->and($area->respondsToSelector($item->action()))->toBeTrue();
+});
+
 it('lets a standard item given an id report instead', function (): void {
     $menus = quietMenus();
     $this->opened[] = quietWindow($menus, MenuBar::make(

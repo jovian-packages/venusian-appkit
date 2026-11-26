@@ -2,6 +2,8 @@
 
 ## 2026-11-26
 
+* **Update**: [Session](/architecture/session.md), [Menu bar](/architecture/menu-bar.md): `applyColorScheme()` sets the application's appearance (dark or light Aqua, nil for system; needs ext-appkit 0d3836f); `StandardKind::PASTE_AND_MATCH_STYLE` is `pasteAsPlainText:`. Tests in `tests/Integration/SessionTest.php` and `tests/Windowless/MenuBarTest.php`.
+
 * **Update**: [UI primitives](/architecture/ui-primitives.md): `AppkitScrollView` reports scrolling (topside's `watchScroll()`). `tests/Integration/ScrollViewWatchTest.php` (3 cases) on 8.4 NTS and ZTS.
 * **Update**: [UI primitives](/architecture/ui-primitives.md), [Window](/architecture/window.md): `ButtonStyle::HELP` as the help bezel (needs ext-appkit 0d48479); `openUrl()` through `NSWorkspace`. `tests/Integration/ButtonStyleTest.php` (2 cases); 239 Pest tests on 8.4 NTS and ZTS.
 * **Update**: [Window](/architecture/window.md): alerts (topside 85ef6af), an `NSAlert` sheet; Return on the default, Esc on the cancel unless it is also the default. `tests/Integration/AlertTest.php` (6 cases) on 8.4 NTS and ZTS.

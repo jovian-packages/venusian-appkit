@@ -2,8 +2,10 @@
 
 namespace Jovian\Toolkits\Appkit;
 
+use NSAppearance;
 use NSAttributedString;
 use Surface\Toolkits\ToolkitSession;
+use Surface\Contracts\Toolkits\Styling\ColorScheme;
 use Surface\Toolkits\Menus\AboutPanel;
 
 class AppkitSession extends ToolkitSession
@@ -13,6 +15,18 @@ class AppkitSession extends ToolkitSession
         $this->application = new Appkit()
             ->setDelegate()
             ->finishLaunching();
+    }
+
+    /**
+     * The application's own appearance: dark or light Aqua; none, which follows the system, for SYSTEM.
+     */
+    protected function applyColorScheme(ColorScheme $scheme): void
+    {
+        $this->application()->get()->setAppearance(match ($scheme) {
+            ColorScheme::DARK => NSAppearance::appearanceNamed(NSAppearanceNameDarkAqua),
+            ColorScheme::LIGHT => NSAppearance::appearanceNamed(NSAppearanceNameAqua),
+            ColorScheme::SYSTEM => null,
+        });
     }
 
     /**
