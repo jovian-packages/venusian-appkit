@@ -22,6 +22,23 @@ function shownAlert(AppkitWindow $window): NSAlert
     return (fn (): ?NSAlert => $this->alert)->call($window);
 }
 
+/**
+ * The NSAlert the window shows, once its sheet is the key window. AppKit reports Return on the
+ * default button only while the sheet is key, so its keys are read only then. The window is made
+ * active first, which macOS may decline: see requireActive().
+ */
+function keyAlert(AppkitWindow $window, Alert $alert): NSAlert
+{
+    requireActive($window);
+    $window->alert($alert);
+    $native = shownAlert($window);
+    if (! pumpUntil(fn (): bool => $native->window()->isKeyWindow())) {
+        throw new RuntimeException("The alert on '{$window->name()}' did not become the key window.");
+    }
+
+    return $native;
+}
+
 it('shows an NSAlert sheet on the window and returns at once', function (): void {
     $window = openWindow();
     takeMail();
@@ -38,18 +55,14 @@ it('shows an NSAlert sheet on the window and returns at once', function (): void
 });
 
 it('gives Return to the default button and Esc to none when the default is also the cancel', function (): void {
-    $window = openWindow();
-    $window->alert(confirmation());
-    $native = shownAlert($window);
+    $native = keyAlert(openWindow(), confirmation());
 
     expect(array_map(fn (NSButton $b): string => $b->title(), $native->buttons()))->toBe(['Clear Key', 'Cancel'])
         ->and(array_map(fn (NSButton $b): string => $b->keyEquivalent(), $native->buttons()))->toBe(['', "\r"]);
 });
 
 it('gives Esc to the cancel button when it is not the default', function (): void {
-    $window = openWindow();
-    $window->alert(new Alert('Save?', buttons: ['Save', 'Don\'t Save', 'Cancel']));
-    $native = shownAlert($window);
+    $native = keyAlert(openWindow(), new Alert('Save?', buttons: ['Save', 'Don\'t Save', 'Cancel']));
 
     expect(array_map(fn (NSButton $b): string => $b->keyEquivalent(), $native->buttons()))->toBe(["\r", '', "\e"]);
 });

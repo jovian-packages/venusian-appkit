@@ -23,8 +23,10 @@ use Jovian\Toolkits\Appkit\UI\Concerns\TakesInputFromAbove;
  *
  * Wrapping breaks the text into lines at the width the label is given: its horizontal
  * compression resistance drops to 490, below a window's size-stay-put (500), so a narrow
- * window wraps it instead of widening. Unwrapping and a null colour restore what AppKit built
- * the label with.
+ * window wraps it instead of widening. Truncating is one line cut at the tail
+ * (TRUNCATING_TAIL, one line), with the same low resistance, so a long text is cut at the
+ * width the label is given instead of widening what holds it; it wins over wrapping.
+ * Neither, and a null colour, restore what AppKit built the label with.
  *
  * Runs are the field's attributed string: the whole text in the label's font and colour, then
  * each run's range (in UTF-16 units, as NSString counts) given the label's font with the bold
@@ -76,16 +78,32 @@ class AppkitLabel extends TKLabel
         $this->writeRuns();
     }
 
-    /**
-     * Preferred max layout width 0 is AppKit's automatic width: the label wraps at the width
-     * layout gives it.
-     */
     protected function applyWrap(bool $wrap): void
     {
+        $this->applyLines();
+    }
+
+    protected function applyTruncate(bool $truncate): void
+    {
+        $this->applyLines();
+    }
+
+    /**
+     * Truncating, wrapping, or as built. Preferred max layout width 0 is AppKit's automatic
+     * width: the label wraps, or is cut, at the width layout gives it.
+     */
+    private function applyLines(): void
+    {
+        [$break, $lines, $resistance] = match (true) {
+            $this->truncates() => [NSLineBreakMode::TRUNCATING_TAIL, 1, 490.0],
+            $this->wraps() => [NSLineBreakMode::WORD_WRAPPING, 0, 490.0],
+            default => [$this->built_break, $this->built_lines, $this->built_resistance],
+        };
+
         $label = $this->labelNative();
-        $label->setLineBreakMode($wrap ? NSLineBreakMode::WORD_WRAPPING : $this->built_break);
-        $label->setMaximumNumberOfLines($wrap ? 0 : $this->built_lines);
-        $label->setContentCompressionResistancePriorityForOrientation($wrap ? 490.0 : $this->built_resistance, NSLayoutConstraintOrientation::HORIZONTAL);
+        $label->setLineBreakMode($break);
+        $label->setMaximumNumberOfLines($lines);
+        $label->setContentCompressionResistancePriorityForOrientation($resistance, NSLayoutConstraintOrientation::HORIZONTAL);
         $label->setPreferredMaxLayoutWidth(0.0);
     }
 

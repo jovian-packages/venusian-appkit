@@ -4,6 +4,7 @@ namespace Jovian\Toolkits\Appkit;
 
 use NSAlert;
 use NSAlertStyle;
+use NSSavePanel;
 use NSBackingStoreType;
 use NSControlStateValue;
 use NSURL;
@@ -20,6 +21,7 @@ use Surface\Contracts\Toolkits\Mail\Windows\WindowScaleChanged;
 use Surface\Toolkits\ToolkitWindow;
 use Surface\Contracts\Toolkits\Dialogs\Alert;
 use Surface\Contracts\Toolkits\Dialogs\AlertStyle;
+use Surface\Contracts\Toolkits\Dialogs\SaveRequest;
 use Surface\Contracts\Toolkits\UI\TKColumn as ColumnContract;
 
 class AppkitWindow extends ToolkitWindow
@@ -58,6 +60,9 @@ class AppkitWindow extends ToolkitWindow
     /** The NSAlert shown as a sheet on the window, until it is answered. */
     protected ?NSAlert $alert = null;
 
+    /** The NSSavePanel shown as a sheet on the window, until it is answered. */
+    protected ?NSSavePanel $save = null;
+
     public function __construct(
         string $name,
         AppkitSession $session,
@@ -67,6 +72,15 @@ class AppkitWindow extends ToolkitWindow
         ?AppkitWindow $parent = null,
     ) {
         parent::__construct($name, $session, $driver, $width, $height, $parent);
+    }
+
+    /**
+     * The driver this window was opened by.
+     */
+    public function adapter(): AppkitAdapterDriver
+    {
+        /** @var AppkitAdapterDriver */
+        return $this->adapter;
     }
 
     /**
@@ -301,6 +315,34 @@ class AppkitWindow extends ToolkitWindow
         });
     }
 
+    /**
+     * An NSSavePanel, as a sheet on the window. The name is the panel's name field, the
+     * directory its directoryURL, the title its message (a sheet has no title bar). AppKit asks
+     * itself before replacing a file. The chosen path is the panel's URL when it ends with OK.
+     */
+    protected function showSave(SaveRequest $request): void
+    {
+        $panel = NSSavePanel::savePanel();
+        if (! is_null($request->name)) {
+            $panel->setNameFieldStringValue($request->name);
+        }
+        if (! is_null($request->title)) {
+            $panel->setMessage($request->title);
+        }
+        if (! is_null($request->directory)) {
+            $panel->setDirectoryURL(NSURL::fileURLWithPath($request->directory));
+        }
+
+        $this->save = $panel;
+        $panel->beginSheetModalForWindowCompletionHandler($this->live(), function (int $result) use ($panel): void {
+            if ($this->save !== $panel) {
+                return;
+            }
+            $this->save = null;
+            $this->saveAnswered($result === NSModalResponseOK ? $panel->URL()?->path() : null);
+        });
+    }
+
     /** NSWorkspace opens it with the user's browser. */
     protected function openUrl(string $url): void
     {
@@ -317,6 +359,16 @@ class AppkitWindow extends ToolkitWindow
         $this->alert = null;
         if (! is_null($native) && ! is_null($this->window)) {
             $this->window->endSheetReturnCode($native->window(), NSModalResponseCancel);
+        }
+    }
+
+    /** The sheet ends before the window closes; its completion handler then finds it gone. */
+    protected function closeSave(): void
+    {
+        $panel = $this->save;
+        $this->save = null;
+        if (! is_null($panel) && ! is_null($this->window)) {
+            $this->window->endSheetReturnCode($panel, NSModalResponseCancel);
         }
     }
 

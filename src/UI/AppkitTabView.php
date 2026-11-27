@@ -13,6 +13,7 @@ use NSLayoutConstraint;
 use Surface\Toolkits\UI\TKTabView;
 use Surface\Toolkits\UI\TKPrimitive;
 use Jovian\Toolkits\Appkit\UI\Concerns\AppkitNative;
+use Jovian\Toolkits\Appkit\UI\Concerns\PinsInMargin;
 use Jovian\Toolkits\Appkit\UI\Concerns\StretchesChildren;
 use Jovian\Toolkits\Appkit\UI\Concerns\CarriesEnabledDown;
 
@@ -28,6 +29,7 @@ class AppkitTabView extends TKTabView
     }
     use CarriesEnabledDown;
     use StretchesChildren;
+    use PinsInMargin;
 
     private ?ObjCDelegate $delegate = null;
 
@@ -144,17 +146,7 @@ class AppkitTabView extends TKTabView
     private function pin(TKPrimitive $page): void
     {
         NSLayoutConstraint::deactivateConstraints($this->pins[$page->uuid()] ?? []);
-
-        $view = $page->native();
-        $holder = $this->items[$page->uuid()]->view();
-        $margin = $page->margin();
-        $this->pins[$page->uuid()] = [
-            $view->leadingAnchor()->constraintEqualToAnchorConstant($holder->leadingAnchor(), (float) $margin->left),
-            $view->trailingAnchor()->constraintEqualToAnchorConstant($holder->trailingAnchor(), (float) -$margin->right),
-            $view->topAnchor()->constraintEqualToAnchorConstant($holder->topAnchor(), (float) $margin->top),
-            $view->bottomAnchor()->constraintEqualToAnchorConstant($holder->bottomAnchor(), (float) -$margin->bottom),
-        ];
-        NSLayoutConstraint::activateConstraints($this->pins[$page->uuid()]);
+        $this->pins[$page->uuid()] = self::pinInMargin($page, $this->items[$page->uuid()]->view());
     }
 
     private function fit(): void

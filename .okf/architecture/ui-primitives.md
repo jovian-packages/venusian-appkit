@@ -5,7 +5,7 @@ description: The AppKit column, row, fixed, label, button, check box, switch and
 resource: src/UI/
 tags: [appkit, primitives]
 status: draft
-generated: { by: claude-opus/5.5, at: 2026-11-26T01:00:00Z }
+generated: { by: claude-opus/5.5, at: 2026-11-27T00:40:00Z }
 sources:
   - id: native
     resource: src/UI/Concerns/AppkitNative.php
@@ -23,17 +23,18 @@ sources:
 
 # Classes
 
-Each extends Topside's class (`TKColumn`, `TKRow`, `TKFixed`, `TKLabel`, `TKButton`, `TKCheckbox`, `TKToggle`, `TKDropdown`, `TKTextInput`, `TKComboBox`, `TKDatepicker`, `TKLink`, `TKSeparator`, `TKProgressBar`, `TKSpinner`, `TKSlider`, `TKToggleButton`, `TKSegmentedControl`, `TKImage`, `TKScrollView`, `TKTabView`, `TKSplitView`, `TKGrid`, `TKTable`, `TKTextArea`, `TKListView`, `TKCollectionView`, `TKTree`, `TKOverlay`, `TKWebView`) and fills in its hooks; the driver's `$primitives` map names them. Fonts and alignment of what shows text are in `AppkitText`. Shared native work is in `AppkitNative`, what column and row share in `AppkitStackChildren`.[^native]
+Each extends Topside's class (`TKColumn`, `TKRow`, `TKFixed`, `TKFlow`, `TKLabel`, `TKButton`, `TKCheckbox`, `TKToggle`, `TKDropdown`, `TKTextInput`, `TKComboBox`, `TKDatepicker`, `TKLink`, `TKSeparator`, `TKProgressBar`, `TKSpinner`, `TKSlider`, `TKToggleButton`, `TKSegmentedControl`, `TKImage`, `TKScrollView`, `TKTabView`, `TKSplitView`, `TKGrid`, `TKTable`, `TKTextArea`, `TKListView`, `TKCollectionView`, `TKTree`, `TKOverlay`, `TKWebView`) and fills in its hooks; the driver's `$primitives` map names them. Fonts and alignment of what shows text are in `AppkitText`. Shared native work is in `AppkitNative`, what column and row share in `AppkitStackChildren`.[^native]
 
 | Class | Native |
 |---|---|
 | `AppkitColumn`, `AppkitRow` | `NSStackView` with spacing and edge insets; a child's alignment as constraints, its fill as hugging priority and the distribution, re-settled when a child is shown or hidden |
 | `AppkitFixed` | plain `NSView`: children framed with `setFrame`, top-left based against the unflipped view, re-framed when it resizes; the larger of frame and minimum; its floor covers every frame |
+| `AppkitFlow` | plain `NSView`, children side by side at their fitting size, wrapping where its width runs out; see Flow |
 | `AppkitLabel` | `NSTextField::labelWithString`, left-aligned at build; colour null restores the colour read at build; runs as its attributed string (below) |
 | `AppkitButton` | `NSButton` with an `ObjCTarget` (held weakly) that calls `clicked()`; in the Tab order only with Full Keyboard Access on, as macOS does; style, colour, icon and role below |
 | `AppkitCheckbox` | `NSButton::checkboxWithTitleTargetAction`; its action (the user's toggle only) reports the new state |
 | `AppkitToggle` | `NSSwitch`; its action reports the new state |
-| `AppkitDropdown` | pop-up `NSPopUpButton`, options added as menu items so repeated titles stay separate; its action reports the chosen index |
+| `AppkitDropdown` | pop-up `NSPopUpButton`, options added as menu items so repeated titles stay separate; its action reports the chosen index. An option's icon is its item's image (`AppkitIcon`: the file at a symbol's size, else the SF Symbol). Icon-only is borderless with `IMAGE_ONLY`: the cell draws the selected item's image on the face, AppKit's arrow beside it (measured 44 x 13 points with a symbol; 105 x 25 bordered with titles); off, the position AppKit gave at build comes back (`NO_IMAGE`) |
 | `AppkitTextInput` | `NSTextField` / `NSSecureTextField` / `NSSearchField` (search), at least 120 wide; Return is the delegate's `insertNewline:` (the action also fires when editing ends) |
 | `AppkitComboBox` | `NSComboBox`, completions in `Support/AppkitCompletionList` (a child window that never becomes key); typed text deselects the option |
 | `AppkitDatepicker` | `NSDatePicker`, field and stepper (no calendar popup: ext-appkit has no NSPopover) |
@@ -41,7 +42,7 @@ Each extends Topside's class (`TKColumn`, `TKRow`, `TKFixed`, `TKLabel`, `TKButt
 | `AppkitSeparator` | `NSBox` separator, one point |
 | `AppkitProgressBar` | `NSProgressIndicator` bar; at least 120 wide at priority 490, over the stack's pull to zero |
 | `AppkitSpinner` | spinning `NSProgressIndicator`, not drawn while stopped |
-| `AppkitSlider` | continuous `NSSlider`; 120 wide as the progress bar is |
+| `AppkitSlider` | continuous `NSSlider`; 120 wide as the progress bar is; tracks a press one event at a time (see Slider) |
 | `AppkitToggleButton` | push-on, push-off `NSButton` |
 | `AppkitSegmentedControl` | `NSSegmentedControl`, select-one |
 | `AppkitImage` | layer-backed view (`NSImageView` cannot cover); natural size at priority 485, a FIT height set again as the width changes (no aspect constraint is bound) |
@@ -55,6 +56,7 @@ Each extends Topside's class (`TKColumn`, `TKRow`, `TKFixed`, `TKLabel`, `TKButt
 | `AppkitCollectionView` | `NSCollectionView` flow layout; a click activates |
 | `AppkitTree` | `NSOutlineView`; descendants AppKit closes and reopens with their ancestor are told from the user's |
 | `AppkitWebView` | `WKWebView` (`initWithFrameConfiguration`, a fresh `WKWebViewConfiguration`); `load` → `loadRequest`, `loadHtml` → `loadHTMLStringBaseURL` (base URL null when none), `reload`, `stopLoading`; see Web view |
+| `AppkitVideo` | the view of a player from the video manager's driver (`appkit.video.driver`: `webview`, the default, a `WKWebView`; `avkit`, an `AVPlayerView`); see Video |
 | `AppkitOverlay` | layer-backed plain `NSView`, children as subviews in order (the first at the back). Each child placed on both axes by its Align, or FILL where it fills, inside padding and margin, with the stack's constraints (`AppkitPlacesChildren`); see below |
 
 # Look and layout settings
@@ -67,7 +69,7 @@ Topside's optional hooks are overridden only where AppKit shows the setting itse
 | Padding (grid) | Per side: the constants pinning the `NSGridView` inside its plain view |
 | Margin in a column or row | Across the axis: added to the padding in the child's constraints (CENTER centres in the room the two sides leave). Between shown children: `setCustomSpacingAfterView` = spacing + the margins facing each other. Before the first and after the last shown child: added to the padding in the edge insets. Recomputed on attach, detach, show, hide, reorder, spacing and padding. Left and right are leading and trailing in a left-to-right layout |
 | Margin in a fixed | The frame moves in by the left and top margin; the fixed's floor reaches past the right and bottom margin |
-| Margin of a tab page | The constants of the page's pins inside its item's view; the tab view's least size counts it |
+| Margin of a tab page | The constants of the page's pins inside its item's view (`PinsInMargin`, none while the page is hidden); the tab view's least size counts it |
 | Tooltip | `NSView::setToolTip` |
 | Border | The layer's `borderWidth` and `borderColor`, inside the bounds; a null colour is `NSColor::separatorColor`, the system line colour, resolved when the border is set (a layer keeps a CGColor, which does not follow a later appearance change). Width 0 takes it away |
 | Cursor | `AppkitPointer`: an `NSTrackingArea` (cursor update, enter and exit, visible rect, active app) owned by the view, one shared local monitor. A cursor update or enter with the pointer inside sets the `NSCursor` (the update is taken, so the owner's `cursorUpdate:` does not reset it); the update on leaving goes to AppKit, which shows its arrow again. ARROW arrow, POINTER pointing hand, TEXT I-beam, CROSSHAIR crosshair, GRAB open hand, GRABBING closed hand, NOT_ALLOWED operation-not-allowed, RESIZE_HORIZONTAL / RESIZE_VERTICAL resize left-right / up-down, RESIZE_NWSE / RESIZE_NESW `frameResizeCursorFromPositionInDirections` top-left / top-right, all directions. A text field shows a cursor set on it while not editing |
@@ -75,7 +77,7 @@ Topside's optional hooks are overridden only where AppKit shows the setting itse
 | Button style | DEFAULT bordered; HELP bordered with `NSBezelStyle::HELP_BUTTON`, AppKit's round "?" (20 x 20 whatever the title, which it does not draw; the bezel the button was made with comes back with any other style); BORDERLESS and LINK `setBordered(false)` (no bezel inset: `size()`, the frame, is then the title and icon); LINK's title in `NSColor::linkColor`, its pointing hand through the cursor |
 | Button text colour | An attributed title with `NSForegroundColorAttributeName`, the button's font and alignment, plus `contentTintColor` (colours a symbol icon too); no colour writes the plain title again. Every label, style, font, colour and alignment change writes the title, so `setTitle` never drops the colour |
 | Button font, alignment | `NSControl::setFont`, `setAlignment` |
-| Button icon | `NSImage::initWithContentsOfFile` (a file wins when AppKit reads it), else `imageWithSystemSymbolNameAccessibilityDescription`; `IMAGE_LEADING`; none `NO_IMAGE` |
+| Button icon | `NSImage::initWithContentsOfFile` (a file wins when AppKit reads it), else `imageWithSystemSymbolNameAccessibilityDescription`; `IMAGE_LEADING`; none `NO_IMAGE`. AppKit draws a symbol at the button's font but a file at its own size (a 72 px file at 72 dpi is 72 points), so a file gets the size a symbol has: `setSize:` to a 16-point box at `NSFont::systemFontSize()`, in proportion to the button's font, on its longer side, the shape kept; again on a font change (`tests/Integration/ButtonIconSizeTest.php`: 72 x 72 → 16 x 16, 72 x 36 → 16 x 8, twice the system size → 32 x 32) |
 | Button role | Key equivalent: DEFAULT Return (AppKit draws it as the default button), CANCEL Esc, none empty |
 | Search field | `NSSearchField::initWithFrame`, the same delegate as the plain field. With a minimum height at least the large control's (30, measured on a large field; regular is 22) it is `NSControlSize::LARGE` (ext-appkit f6a12a4), else REGULAR. The bezel fills a taller frame and the text stays centred (at 32 high the field editor is 16 high at y=8) |
 | Borderless search field | Keeps its bezel, which is its rounded fill, and loses the focus ring (`NSFocusRingType::NONE`); false puts the ring back |
@@ -89,8 +91,9 @@ Left unshown on AppKit:
 |---|---|
 | `Cursor::MOVE` | AppKit has no move cursor |
 | Margin in a grid | NSGridView's own space is a whole row's or column's padding, which moves every cell in that line |
-| Margin in a scroll view | NSScrollView's content insets are not it. Measured 2026-11-24 in a real window, margin 20 50 40 30 (top left bottom right) on a column in a 400x300 scroll view: the vertical scroller went from 16x300 at the edge to 16x240, 30 in, so the insets move the scrollers too; the pinned document stayed the clip view's width and ran 50 past the right edge; and its top sat 40 above the view instead of 20 below (lines 0 and 1 hidden in the screenshot) |
-| Margin in a split view, window content | A split view frames its panes itself; the window's content column has no container to keep it |
+| Margin in a scroll view | The document is a holder `NSView` with the content pinned inside it by its margin (`PinsInMargin`), the holder pinned to the clip view as the content was; it starts at the top (the holder is not flipped: the pins and the clip view's top keep it there). Measured 2026-11-26: content with margin 5 0 0 7 sits 7 in and 5 below the holder's top, the scroll position 0 at the start; margin 0 puts it back at 0, 0. NSScrollView's content insets are not it (measured 2026-11-24, margin 20 50 40 30 on a column in a 400x300 scroll view: they inset the scrollers too, 16x300 at the edge became 16x240, 30 in; the pinned document stayed the clip view's width and ran 50 past the right edge; and its top sat 40 above the view instead of 20 below) |
+| Margin of a split pane | Each pane is a holder `NSView` with the child pinned inside it by its margin (`PinsInMargin`), hidden while the child is; the divider's constraint is on the first pane. NSSplitView keeps its divider beside a hidden pane, margin or none (599 of 600, as before) |
+| Margin of the window's content | The window's content column has no container to keep it |
 | A frameless search field | Without its bezel an NSSearchField still draws its placeholder past the search button, but the field editor it edits in covers the whole field: the text ran under the magnifier ("S🔍arch") and sat at the top of a taller field. Measured 2026-11-24 at 32 high: the field editor is at x=0, y=0, 32 high with no bezel; x=26, y=8, 16 high with it. The cell answers the right rects (`searchTextRectForBounds:` x=26) and does not use them; no property changes it, so a search field keeps its bezel |
 | A plain borderless field taller than its text | NSTextField draws its text at the top; it has no vertical alignment. A row that centres the field (its natural height) does it |
 | Text input maximum length | An NSTextField has no limit of its own: it takes one only through a formatter, and no `NSFormatter` is bound |
@@ -103,6 +106,14 @@ Left unshown on AppKit:
 * **Hidden children** have no constraints while hidden, so they size nothing; their frame is AppKit's to leave meanwhile, and they are placed again when shown.
 * `ImageScaling::FILL` in an overlay covers and crops: on a 620x320 overlay a 3200x2000 picture shows a 43.5-point top band where cover-and-crop predicts 43.8 and stretching 64.
 
+# Flow
+
+`AppkitFlow` (topside 9ca0235, `TKFlow`): AppKit has no wrapping container for plain views (`NSStackView` does not wrap), so the flow places its children. Each child's leading and top edges are constraints to the flow's, and their constants are its place: the child's `fittingSize()`, its margin, the spacing and the padding, children in display order, a child that would pass the right padding starting the next line at the left padding (a child wider than the room has a line to itself). A hidden child has no place and takes no room. The flow's own constraints: a width floor at the widest box and the padding (no child is cut), a pull to one line of everything at priority 485 (above a column's pull to zero, 480; below a window's size-stay-put, 500), and a height floor at the lines' height, so a column holding it grows as it wraps. The places are worked out again on attach, detach, reorder, spacing, padding, a child's margin, minimum size or visibility, and from the frame-change notification of the flow (its width decides the lines) and of each child (its content changed). A change in a layout pass is not laid out again by AppKit (measured: a child's leading edge kept its old constant while its top took the new one), so a notification's lining up runs on a zero-delay `NSTimer`, one at a time. `tests/Integration/FlowTest.php`: 9 cases.
+
+# A view reports its size
+
+`applyWatchSize()` is in `AppkitNative`, so every primitive has it (the stacks through `AppkitStackChildren`, which uses it; no primitive outside that trait extends `TKPrimitive`). On: `setPostsFrameChangedNotifications(true)` and an `NSNotificationCenter` observer of `NSViewFrameDidChangeNotification` for that view, whose block calls `sizeChanged()` (topside keeps the last size and skips repeats and a 0 side). Off, and at `releaseNative()`, the observer is removed. `tests/Integration/ViewResizedTest.php`: 3 cases.
+
 # Homogeneous columns and rows
 
 * `applyHomogeneous()`: the stack's distribution is `FILL_EQUALLY`, and every shown child is tied to the first along the axis at 999. `FILL_EQUALLY` alone did not hold: its own ties gave way to a wrapping label's compression resistance (490) and a view's pull to zero (480), so a long-text card stayed 902 wide beside a 54-wide short one, and a column's children kept their own heights (measured). Off, the distribution follows the fillers again (FILL with ties at 200, or GRAVITY_AREAS) and each child has its own length.
@@ -111,6 +122,7 @@ Left unshown on AppKit:
 
 # Label runs
 
+* `applyWrap()` and `applyTruncate()` set one line mode from both (`wraps()`, `truncates()`): truncating is `TRUNCATING_TAIL`, one line, horizontal compression resistance 490 (below a window's 500, as wrapping has), so a long text is cut at the width the label is given; it wins over wrapping, and ending it gives the wrap back. Measured 2026-11-26 (`tests/Integration/LabelTruncateTest.php`): in a 200-point window the label's frame is x -2, 204 wide (a text field's frame reaches 2 pt past its alignment rect each side), the window stays 200, the label one line; whole, the same text fits at more than 200.
 * `applyRuns()`: an `NSMutableAttributedString` of the joined text in the field's font and text colour, then per run, over its range in UTF-16 units (NSString's length: an emoji outside the BMP is 2), the field's font with the bold and/or italic trait (`NSFontManager convertFont:toHaveTrait:`) and its colour. No paragraph style is written, so the field's own alignment and line breaking (wrapping) still apply.
 * The field's font, colour and alignment setters rewrite the whole attributed string, so with runs each change sets the field, then writes the runs again: a new font keeps the bold run bold at the new size, a new colour reaches the plain runs and not a coloured one. `setText()` is the field's plain string again.
 * A colour emoji draws in its own colours whatever the run's colour (AppKit's).
@@ -127,6 +139,16 @@ Left unshown on AppKit:
 * A `WKWebView` has no intrinsic size: in a column it is as high as the room gives it, 0 in an unconstrained one, so give it a `minSize()`.
 * Embeds that check the page's origin (YouTube's player answered "Error 153" to a page without one) work through `loadHtml()` with a base URL: the iframe sees that origin.
 * `reload()` of a `loadHtml()` page reloads its base URL, as WebKit does, not the HTML.
+
+# Video
+
+* `AppkitVideo` owns no player code. `AppkitWindow::adapter()->video()` is the package's `AppkitVideoManager` (the framework's `Manager`; `appkit.video.driver`, `extend()` for more), its driver makes one `AppkitVideoPlayer` per view, and the view places `view()` and forwards every hook. The player reports through `AppkitVideoListener` (`videoPlaying`, `videoPaused`, `videoEnded`, `videoFailed`), which `AppkitVideo` turns into Topside's video mail. Nothing outside `src/Video/WebView/` knows about a web view, and nothing outside `src/Video/Avkit/` knows about jovian/venusian-avkit.
+* A video that takes no input shows no controls: the player is given controls only while both `setControls(true)` and the enabled cascade allow them; `hasControls()` keeps what was set.
+* `webview` (`WebViewVideoPlayer`): the media is the page. A file loads with `loadFileURL:allowingReadAccessToURL:`, read access to the file alone; any other URL with `loadRequest:`. WebKit lets a page read only what `loadFileURL:` grants (an HTML string reads nothing: the kernel denies the networking process the file), and a `file://` page shows a `file://` resource only on its own volume (`SecurityOrigin::canDisplay`, `filesHaveSameVolume`; no public API lifts it). With the media as the page both hold on every volume (a volume of its own made by `hdiutil` in `VideoTest`).
+* A document-start user script takes the `<video>` WebKit makes (found twice on a media document, taken once): autoplay off, paused, muting, looping and controls of the load, the picture whole on black. A document-end script reports a page with no element (a 404 page, a file that is not media) as an error. Reports come through one `WKScriptMessageHandler` as JSON with the load's number; one from an earlier load is dropped. Calls wait until the element is taken, then run through `evaluateJavaScript:` with no completion handler (`play()` returns a promise, which WebKit cannot hand back). A `play()` rejected with `AbortError` (a pause interrupted it) is not a failure.
+* `pause` before `ended` at the end (the position at the duration) is dropped. A navigation that fails posts `VideoFailed` with the error's description, except `NSURLErrorCancelled` and `WebKitErrorDomain` 204 ("Plug-in handled load"), with which WebKit ends every media document's navigation.
+* `release()` removes the message handler and the scripts, clears the delegate, stops the load and loads an empty page: a removed view posts nothing.
+* `avkit` (`AvkitVideoPlayer`): wraps jovian/venusian-avkit's `AvkitPlayer` (an `AVPlayer` in an `AVPlayerView`) and is its listener, passing each report on. `load()` hands over muting, looping and controls, then the URL. The package is a `suggest`; `AvkitVideoDriver` checks for ext-avkit and the package when it is made and throws with the install line for either. Seeks are exact (ext-avkit `seekToTime:toleranceBefore:toleranceAfter:`).
 
 # Button padding
 
@@ -174,7 +196,8 @@ The Mac App Store's sidebar field has no such line under the same setting becaus
 
 # Notes
 
-* Resizing the window and dragging an `NSSlider` hold the pump as a divider does (measured by hand 2026-11-22: up to 4.6 s, and 649 to 1038 ms).
+* Resizing the window holds the pump as a divider does (measured by hand 2026-11-22: up to 4.6 s). A slider does not: see Slider.
+* **Slider.** `AppkitSlider` takes a left press itself from a local event monitor, where the press lands on the slider (the content view's `hitTest:` gives the slider) and the slider is enabled, and has the cell track it: `startTrackingAt:inView:` on the press, `continueTracking:at:inView:` on each drag, `stopTracking:at:inView:mouseIsUp:` on the release, the points in the slider's coordinates. AppKit's tracking loop never starts, so every drag event comes back to the pump and the value is posted from there, as Qt, GTK and Raven do. The cell moves the value and sends no action, so the slider posts it after each step. A press on the bar away from the knob moves the value there, as AppKit's own tracking does. A slider accepts the first click (`acceptsFirstMouse:` is YES): a press in a window that is not key activates the app and makes the window key first. `tests/Integration/SliderDragTest.php` posts the events to the app's own queue; a timer in `NSEventTrackingRunLoopMode` posts the release should AppKit's loop take a press, so a regression fails instead of waiting.
 * **A drag is AppKit's own loop.** The mouse-down's `sendEvent:` returns at release (measured 2026-11-22 on a divider: 664 ms, no pump return), and event monitors see none of it (`NSEvent.h`: "consumed by nested event-tracking loops"). Native callbacks do run inside it: notifications, actions, timers in the common modes (`NSSplitViewDidResizeSubviews`: 21 calls in that drag). So a primitive hears a drag and keeps its value, but the mail waits for release: the event loop cannot be turned from in there (`EventLoop::turn()` sleeps by pumping the toolkit, which would take AppKit's drag events). Read the tracked event with `currentEvent()`; `pressedMouseButtons()` is the hardware's, 0 for posted events. ext-appkit binds no `NSSplitView::setDelegate`.
 * Enabled: [the enabled cascade](/architecture/enabled-cascade.md): containers use `CarriesEnabledDown`, labels and buttons `TakesInputFromAbove` (`NSControl::setEnabled`).
 * A stack pulls its edges in to its children at hugging 740, just under a child's own 750: a START or END child keeps its natural size across the axis. At 750 the two tied and AppKit stretched the child (seen with a START button in a column, 2026-11-21).

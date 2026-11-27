@@ -11,7 +11,9 @@ use ObjCTarget;
 use NSTrackingArea;
 use CAMediaTimingFunction;
 use NSClickGestureRecognizer;
+use NSObject;
 use WeakReference;
+use NSNotificationCenter;
 use RuntimeException;
 use NSAnimationContext;
 use NSLayoutConstraint;
@@ -92,6 +94,9 @@ trait AppkitNative
     /** The cursor-update area while a cursor is shown over the view. */
     private ?NSTrackingArea $cursor_area = null;
 
+    /** Hears the view's frame change while its size is watched. */
+    private ?NSObject $size_observer = null;
+
     /**
      * The view, for the container this primitive is in.
      *
@@ -117,6 +122,7 @@ trait AppkitNative
         $this->stopTransition();
         $this->untrackCursor();
         $this->applyClickable(false);
+        $this->applyWatchSize(false);
         NSLayoutConstraint::deactivateConstraints([...$this->min_size_constraints, ...$this->max_size_constraints]);
         $this->min_size_constraints = [];
         $this->max_size_constraints = [];
@@ -147,6 +153,33 @@ trait AppkitNative
         }
 
         $this->playFade($visible, $seconds);
+    }
+
+    /**
+     * The view's frame-change notification, which AppKit posts only when asked: each posts
+     * sizeChanged(), which keeps the size last sent and leaves a repeat out. Off, or at
+     * release, the observer goes.
+     */
+    protected function applyWatchSize(bool $on): void
+    {
+        if ($on && is_null($this->size_observer)) {
+            $this->native->setPostsFrameChangedNotifications(true);
+            $this->size_observer = NSNotificationCenter::defaultCenter()->addObserverForNameObjectQueueUsingBlock(
+                NSViewFrameDidChangeNotification,
+                $this->native,
+                null,
+                (static fn (WeakReference $self) => static function () use ($self): void {
+                    $self->get()?->sizeChanged();
+                })(WeakReference::create($this)),
+            );
+
+            return;
+        }
+
+        if (! $on && ! is_null($this->size_observer)) {
+            NSNotificationCenter::defaultCenter()->removeObserver($this->size_observer);
+            $this->size_observer = null;
+        }
     }
 
     /**

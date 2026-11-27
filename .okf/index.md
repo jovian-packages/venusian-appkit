@@ -10,6 +10,10 @@ okf_version: "0.2"
 * [UI primitives](architecture/ui-primitives.md) - The AppKit column, row, fixed, label and button on Topside's TK classes, and the native widget each one is.
 * [Enabled cascade](architecture/enabled-cascade.md) - AppKit has no enabled state on a view, so this package carries a container's disabled state down to the controls inside it.
 
+# Design
+
+* [Video](design/video.md) - Approved 2026-11-27: TKVideo on AppKit through a video manager with drivers in this package, the 'webview' driver as the default, the 'avkit' driver through jovian/venusian-avkit, three ext-avkit bindings to add, what was measured, and the build stages.
+
 # Runbooks
 
 * [Testing](runbooks/testing.md) - Pest suite against the real toolkit in a workbench of path repos; macOS only.

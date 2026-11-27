@@ -3,6 +3,7 @@
 namespace Jovian\Toolkits\Appkit\UI;
 
 use NSRect;
+use NSView;
 use NSObject;
 use WeakReference;
 use NSNotificationCenter;
@@ -12,6 +13,7 @@ use NSLayoutConstraint;
 use Surface\Toolkits\UI\TKPrimitive;
 use Surface\Toolkits\UI\TKScrollView;
 use Jovian\Toolkits\Appkit\UI\Concerns\AppkitNative;
+use Jovian\Toolkits\Appkit\UI\Concerns\PinsInMargin;
 use Jovian\Toolkits\Appkit\UI\Concerns\StretchesChildren;
 use Jovian\Toolkits\Appkit\UI\Concerns\CarriesEnabledDown;
 
@@ -19,10 +21,12 @@ use Jovian\Toolkits\Appkit\UI\Concerns\CarriesEnabledDown;
  * An NSScrollView. The document is pinned to the clip view's top, at least as tall as it
  * when it scrolls down, and as wide as it unless it scrolls across.
  *
- * The document's margin is not shown. The scroll view's content insets are not it (measured
- * 2026-11-24 with a margin of 20 50 40 30): they inset the scroller too (16x300 at the edge
- * became 16x240, 30 in), the pinned document stayed the clip view's width and ran 50 past the
- * right edge, and its top sat 40 above the view instead of 20 below.
+ * The document is a holder view with the content pinned inside it by its margin (PinsInMargin);
+ * pinned to the clip view's top, it starts at its top as the content did. The scroll view's
+ * content insets are not the margin
+ * (measured 2026-11-24 with a margin of 20 50 40 30): they inset the scroller too (16x300 at
+ * the edge became 16x240, 30 in), the pinned document stayed the clip view's width and ran 50
+ * past the right edge, and its top sat 40 above the view instead of 20 below.
  */
 class AppkitScrollView extends TKScrollView
 {
@@ -31,9 +35,16 @@ class AppkitScrollView extends TKScrollView
     }
     use CarriesEnabledDown;
     use StretchesChildren;
+    use PinsInMargin;
 
     /** @var list<NSLayoutConstraint> */
     private array $document = [];
+
+    /** The document: the content's holder; null while there is no content. */
+    private ?NSView $holder = null;
+
+    /** @var list<NSLayoutConstraint> the content's pins in the holder */
+    private array $margin = [];
 
     /** Hears the clip view's bounds change: a scroll. */
     private ?NSObject $scroll_observer = null;
@@ -60,16 +71,24 @@ class AppkitScrollView extends TKScrollView
 
     protected function attachNative(TKPrimitive $child): void
     {
-        $this->scrollNative()->setDocumentView($child->native());
+        // Pinned to the clip view by constraints, as the content it stands for was.
+        $this->holder = NSView::initWithFrame(new NSRect(0.0, 0.0, 0.0, 0.0));
+        $this->holder->setTranslatesAutoresizingMaskIntoConstraints(false);
+        self::stretch($this->holder);
+        $this->holder->addSubview($child->native());
+        $this->margin = self::pinInMargin($child, $this->holder);
+        $this->scrollNative()->setDocumentView($this->holder);
         $this->pin($child);
         $this->tellExpansion();
     }
 
     protected function detachNative(TKPrimitive $child): void
     {
-        NSLayoutConstraint::deactivateConstraints($this->document);
-        $this->document = [];
+        NSLayoutConstraint::deactivateConstraints([...$this->document, ...$this->margin]);
+        [$this->document, $this->margin] = [[], []];
         $this->scrollNative()->setDocumentView(null);
+        $child->native()->removeFromSuperview();
+        $this->holder = null;
         $this->tellExpansion();
     }
 
@@ -84,13 +103,18 @@ class AppkitScrollView extends TKScrollView
         }
     }
 
+    /**
+     * The holder keeps the content's margin as it is now.
+     */
     protected function childLayoutChanged(TKPrimitive $child): void
     {
+        $this->repinMargin($child);
         $this->tellExpansion();
     }
 
     protected function childVisibilityChanged(TKPrimitive $child): void
     {
+        $this->repinMargin($child);
         $this->tellExpansion();
     }
 
@@ -122,16 +146,28 @@ class AppkitScrollView extends TKScrollView
             NSNotificationCenter::defaultCenter()->removeObserver($this->scroll_observer);
             $this->scroll_observer = null;
         }
-        NSLayoutConstraint::deactivateConstraints($this->document);
-        $this->document = [];
+        NSLayoutConstraint::deactivateConstraints([...$this->document, ...$this->margin]);
+        [$this->document, $this->margin] = [[], []];
         $this->releaseView();
     }
 
+    private function repinMargin(TKPrimitive $child): void
+    {
+        if (is_null($this->holder)) {
+            return;
+        }
+        NSLayoutConstraint::deactivateConstraints($this->margin);
+        $this->margin = self::pinInMargin($child, $this->holder);
+    }
+
+    /**
+     * The document (the content's holder) to the clip view.
+     */
     private function pin(TKPrimitive $child): void
     {
         NSLayoutConstraint::deactivateConstraints($this->document);
 
-        $view = $child->native();
+        $view = $this->holder ?? $child->native();
         $clip = $this->scrollNative()->contentView();
         $constraints = [
             $view->leadingAnchor()->constraintEqualToAnchor($clip->leadingAnchor()),

@@ -8,6 +8,7 @@ use Surface\Toolkits\Drivers\ToolkitAdapterDriver;
 use Jovian\Toolkits\Appkit\Menus\AppkitMenuBar;
 use Surface\Contracts\Toolkits\UI\TKRow;
 use Surface\Contracts\Toolkits\UI\TKFixed;
+use Surface\Contracts\Toolkits\UI\TKFlow;
 use Surface\Contracts\Toolkits\UI\TKLabel;
 use Surface\Contracts\Toolkits\UI\TKButton;
 use Surface\Contracts\Toolkits\UI\TKColumn;
@@ -24,6 +25,7 @@ use Jovian\Toolkits\Appkit\UI\AppkitComboBox;
 use Jovian\Toolkits\Appkit\UI\AppkitDatepicker;
 use Jovian\Toolkits\Appkit\UI\AppkitRow;
 use Jovian\Toolkits\Appkit\UI\AppkitFixed;
+use Jovian\Toolkits\Appkit\UI\AppkitFlow;
 use Jovian\Toolkits\Appkit\UI\AppkitLabel;
 use Jovian\Toolkits\Appkit\UI\AppkitButton;
 use Jovian\Toolkits\Appkit\UI\AppkitColumn;
@@ -66,6 +68,9 @@ use Surface\Contracts\Toolkits\UI\TKOverlay;
 use Jovian\Toolkits\Appkit\UI\AppkitOverlay;
 use Surface\Contracts\Toolkits\UI\TKWebView;
 use Jovian\Toolkits\Appkit\UI\AppkitWebView;
+use Surface\Contracts\Toolkits\UI\TKVideo;
+use Jovian\Toolkits\Appkit\UI\AppkitVideo;
+use Jovian\Toolkits\Appkit\Video\AppkitVideoManager;
 
 class AppkitAdapterDriver extends ToolkitAdapterDriver
 {
@@ -77,6 +82,7 @@ class AppkitAdapterDriver extends ToolkitAdapterDriver
         TKColumn::class => AppkitColumn::class,
         TKRow::class => AppkitRow::class,
         TKFixed::class => AppkitFixed::class,
+        TKFlow::class => AppkitFlow::class,
         TKLabel::class => AppkitLabel::class,
         TKButton::class => AppkitButton::class,
         TKCheckbox::class => AppkitCheckbox::class,
@@ -104,7 +110,10 @@ class AppkitAdapterDriver extends ToolkitAdapterDriver
         TKTextArea::class => AppkitTextArea::class,
         TKOverlay::class => AppkitOverlay::class,
         TKWebView::class => AppkitWebView::class,
+        TKVideo::class => AppkitVideo::class,
     ];
+
+    private ?AppkitVideoManager $video = null;
 
     public function __construct(
         FrameworkCore $app
@@ -118,6 +127,14 @@ class AppkitAdapterDriver extends ToolkitAdapterDriver
         }
 
         parent::__construct($app);
+    }
+
+    /**
+     * The players this toolkit's videos are made with, made the first time a video asks.
+     */
+    public function video(): AppkitVideoManager
+    {
+        return $this->video ??= new AppkitVideoManager($this->app);
     }
 
     protected function instanceSession(): void

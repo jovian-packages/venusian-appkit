@@ -13,6 +13,8 @@ Venusian AppKit is the macOS toolkit driver for Venusian Topside: it connects PH
 
 Want a Mac app that looks and acts like a Mac app? Write your view once with Topside and Venusian AppKit gives you the real thing: native buttons, text fields, tables, outlines, split and tab views, sheets, alerts, open and save panels, the clipboard, and a menu bar whose Edit items, accelerators and enabled states behave the way macOS users expect.
 
+Need video? A video view plays a file or an https URL through the player you pick in config: a WKWebView by default, with more players added as drivers.
+
 Need more than widgets? A canvas lends its view to Venusian's rendering engines, so Metal, OpenGL, SDL_GPU and Vulkan draw straight into your window with no pixel passing through PHP. Staged windows give a game or a visualizer a whole window of its own, with full screen and exclusive display modes. And with HumanInput installed, the keyboard, the pointer, the wheel and your game controllers read from the same app.
 
 Got a Mac? That's all it takes. Venusian AppKit is macOS only; on Linux, reach for `jovian/venusian-qt`, `jovian/venusian-gtk` or `jovian/venusian-raven` and keep the same views.

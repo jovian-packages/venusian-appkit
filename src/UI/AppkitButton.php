@@ -3,7 +3,6 @@
 namespace Jovian\Toolkits\Appkit\UI;
 
 use NSColor;
-use NSImage;
 use NSButton;
 use NSLayoutConstraint;
 use ObjCTarget;
@@ -22,6 +21,7 @@ use Surface\Contracts\Toolkits\Styling\FontSpec;
 use Surface\Contracts\Toolkits\Styling\TextAlignment;
 use Jovian\Toolkits\Appkit\UI\Concerns\AppkitText;
 use Jovian\Toolkits\Appkit\UI\Concerns\AppkitNative;
+use Jovian\Toolkits\Appkit\UI\Support\AppkitIcon;
 use Jovian\Toolkits\Appkit\UI\Concerns\TakesInputFromAbove;
 
 /**
@@ -35,7 +35,10 @@ use Jovian\Toolkits\Appkit\UI\Concerns\TakesInputFromAbove;
  * LINK's NSColor linkColor) is the title's foreground colour, written as an attributed title
  * with the button's font and alignment, and the content tint, which colours a symbol icon too.
  * With no colour the title is plain again. The icon sits at the leading side of the title, or
- * the trailing side (IMAGE_TRAILING) when setIconPosition() says so;
+ * the trailing side (IMAGE_TRAILING) when setIconPosition() says so. AppKit draws an SF Symbol
+ * at the button's font and an image file at the file's own size, so a file is given the size a
+ * symbol has (AppkitIcon): a box of SYMBOL_POINTS at the system font size, in proportion to the
+ * button's font, the file's shape kept; again when the font changes.
  * Padding: NSButton has no content insets, and the cell draws its title centred in the frame, so
  * the button is sized instead: width and height constraints equal to its intrinsic size plus the
  * padding, at priority PADDING_PRIORITY (above a stack's 750 hugging, so the button is not
@@ -111,7 +114,12 @@ class AppkitButton extends TKButton
 
     protected function applyFont(FontSpec $font): void
     {
-        $this->buttonNative()->setFont(self::nsFont($font));
+        $button = $this->buttonNative();
+        $button->setFont(self::nsFont($font));
+        if (! is_null($this->icon()) && ! is_null($image = $button->image())) {
+            AppkitIcon::fit($image, $button->font());
+            $button->setImage($image);
+        }
         $this->retitle();
     }
 
@@ -132,12 +140,8 @@ class AppkitButton extends TKButton
      */
     protected function applyIcon(?string $file, ?string $symbol): void
     {
-        $image = is_null($file) ? null : NSImage::initWithContentsOfFile($file);
-        if (is_null($image) && ! is_null($symbol)) {
-            $image = NSImage::imageWithSystemSymbolNameAccessibilityDescription($symbol, $this->label() === '' ? null : $this->label());
-        }
-
         $button = $this->buttonNative();
+        $image = AppkitIcon::image($file, $symbol, $this->label() === '' ? null : $this->label(), $button->font());
         $button->setImage($image);
         $button->setImagePosition($this->imagePosition(! is_null($image)));
         $this->refit();

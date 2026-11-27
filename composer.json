@@ -32,10 +32,12 @@
     },
     "require-dev": {
         "pestphp/pest": "^4",
+        "jovian/venusian-avkit": "^0.11.0",
         "venusian/framework": "^0.11.0",
         "venusian/topside": "^0.11.0"
     },
     "suggest": {
+        "jovian/venusian-avkit": "The 'avkit' video driver (appkit.video.driver): a video view plays through an AVPlayer in an AVPlayerView. Checked when the driver is made.",
         "ext-metal": "A canvas lends a CAMetalLayer to the 'metal' rendering engine (jovian/venusian-metal) when ext-metal is loaded.",
         "ext-opengl": "A canvas lends an NSOpenGLView's context to the 'opengl' rendering engine (jovian/venusian-opengl) when ext-opengl is loaded.",
         "ext-sdl3": "With ext-metal, a canvas lends an SDL window over its NSWindow to the 'sdl3' rendering engine (jovian/venusian-sdl3) when ext-sdl3 is loaded.",

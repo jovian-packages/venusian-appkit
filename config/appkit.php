@@ -25,4 +25,20 @@ return [
 
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Video
+    |--------------------------------------------------------------------------
+    |
+    | Driver: what plays a video view. "webview" shows the media in a
+    | WKWebView. "avkit" plays it with an AVPlayer in an AVPlayerView,
+    | through jovian/venusian-avkit. Another package or the app adds a
+    | driver with AppkitAdapterDriver::video()->extend().
+    |
+    */
+
+    'video' => [
+        'driver' => 'webview',
+    ],
+
 ];
